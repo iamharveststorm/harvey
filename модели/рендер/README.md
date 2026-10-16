@@ -30,7 +30,7 @@ set HARVEY_RENDER_DIR=C:\Users\iamha\OneDrive\Документы\Harvey\моде
 ## «Компакт мини» на том же столе
 
 ```bash
-C:envs\harvey-cad\Scripts\python.exe ..\мини\export_render.py
+C:\venvs\harvey-cad\Scripts\python.exe ..\мини\export_render.py
 ```
 
 Скрипт кладёт в `parts_mini/` детали по материалам в позе «машет клешнёй». Потом:
