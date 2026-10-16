@@ -1,0 +1,265 @@
+{
+ "bodies": {
+  "torso": [
+   [
+    "torso__grey.stl",
+    "grey"
+   ],
+   [
+    "torso__servo.stl",
+    "servo"
+   ],
+   [
+    "torso__pcb.stl",
+    "pcb"
+   ],
+   [
+    "torso__battery.stl",
+    "battery"
+   ]
+  ],
+  "leg_coxa": [
+   [
+    "leg_coxa__orange.stl",
+    "orange"
+   ],
+   [
+    "leg_coxa__servo.stl",
+    "servo"
+   ]
+  ],
+  "leg_femur": [
+   [
+    "leg_femur__orange.stl",
+    "orange"
+   ],
+   [
+    "leg_femur__servo.stl",
+    "servo"
+   ]
+  ],
+  "leg_tibia": [
+   [
+    "leg_tibia__orange.stl",
+    "orange"
+   ],
+   [
+    "leg_tibia__tpu.stl",
+    "tpu"
+   ]
+  ],
+  "L_ay": [
+   [
+    "L_ay__grey.stl",
+    "grey"
+   ],
+   [
+    "L_ay__servo.stl",
+    "servo"
+   ]
+  ],
+  "L_up": [
+   [
+    "L_up__orange.stl",
+    "orange"
+   ],
+   [
+    "L_up__servo.stl",
+    "servo"
+   ]
+  ],
+  "L_fore": [
+   [
+    "L_fore__orange.stl",
+    "orange"
+   ]
+  ],
+  "L_hand": [
+   [
+    "L_hand__servo.stl",
+    "servo"
+   ],
+   [
+    "L_hand__tpu.stl",
+    "tpu"
+   ]
+  ],
+  "L_jaw": [
+   [
+    "L_jaw__tpu.stl",
+    "tpu"
+   ]
+  ],
+  "L_eye": [
+   [
+    "L_eye__orange.stl",
+    "orange"
+   ],
+   [
+    "L_eye__screen.stl",
+    "screen"
+   ]
+  ],
+  "R_ay": [
+   [
+    "R_ay__grey.stl",
+    "grey"
+   ],
+   [
+    "R_ay__servo.stl",
+    "servo"
+   ]
+  ],
+  "R_up": [
+   [
+    "R_up__orange.stl",
+    "orange"
+   ],
+   [
+    "R_up__servo.stl",
+    "servo"
+   ]
+  ],
+  "R_fore": [
+   [
+    "R_fore__orange.stl",
+    "orange"
+   ]
+  ],
+  "R_hand": [
+   [
+    "R_hand__servo.stl",
+    "servo"
+   ],
+   [
+    "R_hand__tpu.stl",
+    "tpu"
+   ]
+  ],
+  "R_jaw": [
+   [
+    "R_jaw__tpu.stl",
+    "tpu"
+   ]
+  ],
+  "R_eye": [
+   [
+    "R_eye__orange.stl",
+    "orange"
+   ],
+   [
+    "R_eye__screen.stl",
+    "screen"
+   ]
+  ],
+  "dock": [
+   [
+    "dock_pad.stl",
+    "grey"
+   ],
+   [
+    "dock_tower.stl",
+    "grey"
+   ]
+  ]
+ },
+ "G": {
+  "cox": 27.0,
+  "fem": 30.0,
+  "tib": 48.0,
+  "foot_r": 5.0,
+  "a1": 40.0,
+  "fore": 30.0,
+  "tipx": 24.0,
+  "mounts": {
+   "RF": [
+    42.0,
+    -38.0,
+    -52.0
+   ],
+   "RM": [
+    0.0,
+    -44.0,
+    -90.0
+   ],
+   "RB": [
+    -42.0,
+    -38.0,
+    -135.0
+   ],
+   "LF": [
+    42.0,
+    38.0,
+    52.0
+   ],
+   "LM": [
+    0.0,
+    44.0,
+    90.0
+   ],
+   "LB": [
+    -42.0,
+    38.0,
+    135.0
+   ]
+  },
+  "arm_s": {
+   "L": [
+    57.0,
+    32.0,
+    38.5
+   ],
+   "R": [
+    57.0,
+    -32.0,
+    38.5
+   ]
+  },
+  "eye": {
+   "L": [
+    12.0,
+    30.0,
+    31.0
+   ],
+   "R": [
+    12.0,
+    -30.0,
+    31.0
+   ]
+  },
+  "body": [
+   -50.0,
+   64.0,
+   -44.0,
+   44.0,
+   -15.0,
+   24.0
+  ],
+  "disp_d": 24.0,
+  "disp_t": 4.5,
+  "stalk": 26.0,
+  "wall": 2.0,
+  "plate": 3.0
+ },
+ "GX": 6.0,
+ "GY": -4.0,
+ "masses": {
+  "coxa": 0.02291666666666667,
+  "femur": 0.022783333333333333,
+  "tibia": 0.0019166666666666668,
+  "ay": 0.0217,
+  "up": 0.023,
+  "fore": 0.00175,
+  "hand": 0.021750000000000002,
+  "jaw": 0.0013,
+  "eye": 0.0062,
+  "total": 0.889
+ },
+ "belly_y": [
+  16.0,
+  -16.0
+ ],
+ "dock_h": 4.0,
+ "pogo_top": 11.0,
+ "rest_drop": 13.0
+}
