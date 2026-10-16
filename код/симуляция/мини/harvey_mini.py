@@ -59,20 +59,22 @@ def _vis(body, key=None):
 DOCK_X = 0.20                                          # станция в 20 см перед стартом
 
 
-def dock_xml(visual):
-    """Станция: площадка 64 × 56 × 4 мм, 2 подпружиненных контакта (мягкий контакт = пружина), башенка с меткой."""
+def dock_xml(visual, pos=None):
+    """Станция: площадка 64 × 56 × 4 мм, 2 подпружиненных контакта (мягкий контакт = пружина), башенка с меткой.
+    pos — центр площадки (x, y) на столе; Харви заходит на неё по +x, лицом к башенке."""
     h, top = CAD["dock_h"] * mm, CAD["pogo_top"] * mm
-    g = [f'<geom name="dock_pad" type="box" size="0.030 0.026 {h / 2}" pos="{DOCK_X} 0 {h / 2}" rgba=".3 .3 .32 1" group="1"/>',
-         f'<geom name="dock_tower" type="box" size="0.004 0.030 0.026" pos="{DOCK_X + 0.144} 0 0.026" rgba=".3 .3 .32 1" group="1"/>']
+    DX, DY = pos if pos is not None else (DOCK_X, 0.0)
+    g = [f'<geom name="dock_pad" type="box" size="0.030 0.026 {h / 2}" pos="{DX} {DY} {h / 2}" rgba=".3 .3 .32 1" group="1"/>',
+         f'<geom name="dock_tower" type="box" size="0.004 0.030 0.026" pos="{DX + 0.144} {DY} 0.026" rgba=".3 .3 .32 1" group="1"/>']
     for i, y in enumerate(CAD["belly_y"]):
-        g.append(f'<geom name="pogo{i}" type="cylinder" size="0.0025 {(top - h) / 2}" pos="{DOCK_X} {y * mm} {h + (top - h) / 2}" '
+        g.append(f'<geom name="pogo{i}" type="cylinder" size="0.0025 {(top - h) / 2}" pos="{DX} {DY + y * mm} {h + (top - h) / 2}" '
                  f'solref="0.02 0.7" solimp="0.5 0.9 0.0015" rgba=".85 .7 .3 1" group="1"/>')
     if visual:
-        g += [f'<geom type="mesh" mesh="{f[:-4]}" pos="{DOCK_X} 0 0" material="v_grey" group="2" contype="0" conaffinity="0"/>' for f, _ in CAD["bodies"]["dock"]]
+        g += [f'<geom type="mesh" mesh="{f[:-4]}" pos="{DX} {DY} 0" material="v_grey" group="2" contype="0" conaffinity="0"/>' for f, _ in CAD["bodies"]["dock"]]
     return "".join(g)
 
 
-def build_xml(pen=False, napkin=False, world_xml=None, visual=True, dock=False):
+def build_xml(pen=False, napkin=False, world_xml=None, visual=True, dock=False, dock_pos=None):
     vis = _vis if visual else (lambda *a, **k: "")
     legs = ""
     for n, (x, y, yaw) in MOUNTS.items():
@@ -142,7 +144,7 @@ def build_xml(pen=False, napkin=False, world_xml=None, visual=True, dock=False):
     </body>""" if napkin else ""
     acts = "".join(f'<motor name="m_{j}" joint="{j}" ctrlrange="-{STALL} {STALL}"/>' for j in joint_names())
     meshes = "".join(f'<mesh name="{f[:-4]}" file="{f}"/>' for k, items in CAD["bodies"].items() for f, _ in items if k != "dock" or dock) if visual else ""
-    floor = (world_xml or '<geom name="floor" type="plane" size="1 1 0.1" friction="0.8 0.01 0.001" rgba=".78 .64 .46 1"/>') + (dock_xml(visual) if dock else "")
+    floor = (world_xml or '<geom name="floor" type="plane" size="1 1 0.1" friction="0.8 0.01 0.001" rgba=".78 .64 .46 1"/>') + (dock_xml(visual, dock_pos) if dock else "")
     return f"""<mujoco model="harvey_mini">
   <option timestep="{DT}" integrator="implicitfast"/>
   <visual><global offwidth="1920" offheight="1080"/><quality shadowsize="4096"/></visual>
@@ -230,8 +232,8 @@ def claw_ok(s, q):
 
 # ---------------- симуляция ----------------
 class Mini:
-    def __init__(self, pen=False, napkin=False, world_xml=None, visual=False, assets=None, dock=False):
-        self.m = mujoco.MjModel.from_xml_string(build_xml(pen, napkin, world_xml, visual, dock), assets or (load_assets() if visual else {}))
+    def __init__(self, pen=False, napkin=False, world_xml=None, visual=False, assets=None, dock=False, xml=None):
+        self.m = mujoco.MjModel.from_xml_string(xml or build_xml(pen, napkin, world_xml, visual, dock), assets or (load_assets() if visual else {}))
         self.d = mujoco.MjData(self.m)
         self.j = {k: (self.m.joint(k).qposadr[0], self.m.joint(k).dofadr[0], self.m.actuator(f"m_{k}").id) for k in joint_names()}
         self.kp = {"c": 3.0, "f": 4.0, "k": 4.0, "y": 2.0, "p": 3.0, "e": 3.0, "g": 1.0, "s": 1.0}
