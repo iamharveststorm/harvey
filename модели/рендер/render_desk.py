@@ -1,5 +1,8 @@
 """Харви на уютном рабочем столе — фотореалистичные рендеры (Blender 5.2, Cycles), 3 ракурса × 2 варианта корпуса.
+Всё в реальном масштабе 1 : 1: стол 1,6 × 1,0 м, предметы Poly Haven — в своих размерах (проверено: лист A4 210 × 290,
+ручки 131–161, карандаш 194, зажигалка 39 × 53, стакан Ø84 мм), лежат на столе или друг на друге, не пересекаются.
 Сначала: python export_robot.py  (детали по материалам в parts/)
+«Компакт мини»: модели/мини/export_render.py (parts_mini/), затем HARVEY_ROBOT=mini — кадры Мини_1…3.png.
 Потом:   render_desk.bat  (или blender --background --python render_desk.py с переменной HARVEY_RENDER_DIR)
 Переменные: HARVEY_VARIANTS=tech,soft  HARVEY_VIEWS=1,2,3  HARVEY_SAMPLES=256  HARVEY_RES=1920
 Ресурсы Poly Haven (CC0): C:/harvey-assets/polyhaven — HDRI lythwood_room, дуб oak_veneer_01, модели реквизита."""
@@ -13,7 +16,12 @@ VARIANTS = os.environ.get("HARVEY_VARIANTS", "tech,soft").split(",")
 VIEWS = os.environ.get("HARVEY_VIEWS", "1,2,3").split(",")
 SAMPLES = int(os.environ.get("HARVEY_SAMPLES", "256"))
 RES = int(os.environ.get("HARVEY_RES", "1920"))
-META = json.load(open(os.path.join(D, "parts", "scene.json"), encoding="utf-8"))
+ROBOT_KIND = os.environ.get("HARVEY_ROBOT", "kompakt")
+MINI = ROBOT_KIND == "mini"
+PARTS = "parts_mini" if MINI else "parts"
+if MINI and "HARVEY_VARIANTS" not in os.environ:
+    VARIANTS = ["tech"]
+META = json.load(open(os.path.join(D, PARTS, "scene.json"), encoding="utf-8"))
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
@@ -107,11 +115,13 @@ desk.data.materials.append(oak)
 rig = bpy.data.objects.new("Харви", None); scene.collection.objects.link(rig)
 ROBOT = {}
 for variant in ("tech", "soft"):
-    for f in sorted(os.listdir(os.path.join(D, "parts", variant))):
+    if not os.path.isdir(os.path.join(D, PARTS, variant)):
+        continue
+    for f in sorted(os.listdir(os.path.join(D, PARTS, variant))):
         key = f[:-4]
         if variant == "soft" and key != "shell":
             continue
-        bpy.ops.wm.stl_import(filepath=os.path.join(D, "parts", variant, f), global_scale=0.001)
+        bpy.ops.wm.stl_import(filepath=os.path.join(D, PARTS, variant, f), global_scale=0.001)
         o = bpy.context.selected_objects[0]; o.name = f"{variant}_{key}"
         o.data.materials.append(M[key])
         bpy.ops.object.shade_auto_smooth(angle=math.radians(32))
@@ -136,7 +146,8 @@ for s in ("L", "R"):                             # экраны глаз
             uv.data[li].uv = (0.5 + v.x / (2 * sc["radius"] * 0.001), 0.5 + v.y / (2 * sc["radius"] * 0.001))
     o.data.materials.append(image_mat(f"Глаз {s}", os.path.join(D, "tex", f"eye_{s}.png"), emit_k=2.2, rough=0.15))
     o.parent = rig
-rig.rotation_euler = (0, 0, math.radians(14)); rig.location = (0.02, 0.0, 0.0)
+OFF = Vector((0.06, -0.07, 0.0)) if not MINI else Vector((0.0, 0.0, 0.0))   # «Компакт» шире — в сторону от бумаг, камеры — вместе с ним
+rig.rotation_euler = (0, 0, math.radians(14 if not MINI else 18)); rig.location = Vector((0.02, 0.0, 0.0)) + OFF if not MINI else (0.04, -0.03, 0.0)
 
 
 # ---------------- реквизит Poly Haven ----------------
@@ -155,9 +166,9 @@ def bbox(objs):
     return mn, mx
 
 
-def place(objs, xy, yaw=0.0, scale=1.0, z=0.0):
+def place(objs, xy, yaw=0.0, scale=1.0, z=0.0, name="группа"):
     """Группа объектов: центр по низу — в точку (x, y, z), поворот вокруг вертикали, масштаб."""
-    root = bpy.data.objects.new("группа", None); scene.collection.objects.link(root)
+    root = bpy.data.objects.new(name, None); scene.collection.objects.link(root)
     mn, mx = bbox(objs); c = (mn + mx) / 2
     for o in objs:
         if o.parent is None:
@@ -180,25 +191,36 @@ def keep(objs, names):
 note = import_gltf("office_notepads")
 pad = keep([o for o in note], ["a4_stack", "yellow_pad", "sticky_stack"])
 notes = {n: [o for o in pad if n in o.name] for n in ("a4_stack", "yellow_pad", "sticky_stack")}
-place(notes["a4_stack"], (-0.14, 0.33), 18)
-place(notes["yellow_pad"], (0.06, 0.36), -12)
-place(notes["sticky_stack"], (0.17, 0.30), 25)
+place(notes["a4_stack"], (-0.22, 0.32), 15, name="стопка A4")
+place(notes["yellow_pad"], (0.11, 0.44), -10, name="жёлтый блокнот")
+place(notes["sticky_stack"], (0.31, 0.24), 25, name="стикеры")
 st = import_gltf("stationery_supplies")
+_drop = [o for o in st if o.type == "MESH" and any(n in o.name for n in ("pencil_new_b", "pencil_old"))]
+st = [o for o in st if o not in _drop]
+for o in _drop:                                                    # лишние карандаши набора — убрать
+    bpy.data.objects.remove(o, do_unlink=True)
+CUP = (-0.40, 0.58)
 cup = [o for o in st if "pencilcup" in o.name]
-place(cup, (-0.36, 0.40), 0)
+place(cup, CUP, 0, name="стакан")
 pens = {n: [o for o in st if n in o.name] for n in ("pen_blue", "pen_red", "pen_fancy", "pencil_new_a", "pencil_used", "eraser")}
-place(pens["pen_blue"], (-0.12, 0.30), 70, z=0.012)
-place(pens["pen_red"], (0.05, 0.36), 40, z=0.004)
-place(pens["pen_fancy"], (0.22, -0.02), -35)
-for i, n in enumerate(("pencil_new_a", "pencil_used")):          # карандаши в стакане
-    r = place(pens[n], (-0.36 + 0.008 * (i - 0.5), 0.40 + 0.006 * i), 0, z=0.012)
-    r.rotation_euler = (math.radians(85 + 6 * i), 0, math.radians(30 + 40 * i)); r.location.z = 0.075
-place(pens["eraser"], (-0.03, 0.27), 15)
-place(import_gltf("vintage_lighter"), (0.24, 0.20), 120)
-place(import_gltf("round_spectacles"), (-0.02, -0.33), 160)
-place(import_gltf("standing_picture_frame_01"), (-0.42, -0.30), 35)
-place(import_gltf("potted_plant_02"), (-0.50, -0.58), 0, scale=0.36)
-lamp = place(import_gltf("desk_lamp_arm_01"), (-0.46, 0.62), -130, scale=0.75)
+place(pens["pen_blue"], (-0.22, 0.31), 70, z=0.010, name="синяя ручка")      # лежит на стопке A4 (высота 10 мм)
+place(pens["pen_red"], (0.11, 0.43), 40, z=0.010, name="красная ручка")      # на жёлтом блокноте (10 мм)
+RIGHT = ({"ручка": (0.29, 0.07), "зажигалка": (0.31, -0.07), "наушники": (0.26, -0.22)} if MINI else   # «Компакт» шире —
+         {"ручка": (0.36, 0.12), "зажигалка": (0.37, 0.01), "наушники": (0.34, -0.31)})                      # предметы справа дальше
+place(pens["pen_fancy"], RIGHT["ручка"], -35, name="ручка")                     # на столе
+for i, (n, tilt, yaw) in enumerate((("pencil_new_a", 9, 40), ("pencil_used", 12, 200))):   # карандаши в стакане:
+    r = place(pens[n], (0, 0), 0, name=f"карандаш {i + 1}")        # низ — на дне стакана (6 мм), наклон к стенке
+    L = bbox(pens[n])[1].x - bbox(pens[n])[0].x
+    t, y_ = math.radians(tilt), math.radians(yaw)
+    u = Vector((math.sin(t) * math.cos(y_), math.sin(t) * math.sin(y_), math.cos(t)))
+    lower = Vector((CUP[0] + 0.012 * math.cos(y_ + math.pi), CUP[1] + 0.012 * math.sin(y_ + math.pi), 0.006))
+    r.rotation_euler = (0, math.radians(-(90 - tilt)), y_); r.location = lower + u * (L / 2)
+place(pens["eraser"], (0.03, 0.21), 15, name="ластик")
+place(import_gltf("vintage_lighter"), RIGHT["зажигалка"], 120, name="зажигалка")
+place(import_gltf("round_spectacles"), (-0.12, -0.38), 160, name="очки")
+place(import_gltf("standing_picture_frame_01"), (-0.44, -0.36), 35, name="рамка")
+# potted_plant_02 — напольное растение (горшок Ø47 см, высота 63 см): на стол в реальном масштабе не помещается — убрано
+lamp = place(import_gltf("desk_lamp_arm_01"), (-0.50, 0.78), -130, name="лампа")   # лампа на кронштейне, 89 см — как есть
 
 
 # ---------------- телефон, наушники, кружка (свои модели) ----------------
@@ -220,7 +242,7 @@ bpy.ops.mesh.primitive_plane_add(size=1, location=(0, 0, 0.00785))
 scr = bpy.context.active_object; scr.scale = (0.066, 0.141, 1); bpy.ops.object.transform_apply(scale=True)
 scr.data.materials.append(image_mat("Экран телефона", os.path.join(D, "tex", "phone_wall.png"), emit_k=0.9, rough=0.05))
 scr.parent = phone
-phone.location = (0.25, -0.24, 0); phone.rotation_euler = (0, 0, math.radians(-28 + 90))
+phone.location = (0.25, -0.44, 0); phone.rotation_euler = (0, 0, math.radians(-28 + 90))
 
 acryl = mat("Прозрачный кейс", srgb("#F4F6F8"), 0.04, 0, 0, trans=1.0, ior=1.49)
 white = mat("Белый пластик", srgb("#EDEDEB"), 0.35)
@@ -239,7 +261,7 @@ for sy in (-1, 1):
     d_ = bpy.context.active_object; d_.data.materials.append(white); d_.parent = buds
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0012, location=(0.0255, 0.0, 0.0175))
 rd = bpy.context.active_object; rd.data.materials.append(red); rd.parent = buds
-buds.location = (0.20, -0.08, 0); buds.rotation_euler = (0, 0, math.radians(18))
+buds.location = (*RIGHT["наушники"], 0); buds.rotation_euler = (0, 0, math.radians(18))
 
 cer = mat("Керамика", srgb("#EDE4D3"), 0.25, 0, 0.3)
 coffee = mat("Кофе", srgb("#2B160B"), 0.08)
@@ -253,10 +275,12 @@ bpy.data.objects.remove(inner, do_unlink=True)
 bv = mug.modifiers.new("Фаска", "BEVEL"); bv.width = 0.0015; bv.segments = 3
 mug.data.materials.append(cer); bpy.ops.object.shade_auto_smooth(angle=math.radians(40))
 bpy.ops.mesh.primitive_torus_add(major_radius=0.022, minor_radius=0.0055, location=(0.045, 0, 0.048), rotation=(math.radians(90), 0, 0))
-hd = bpy.context.active_object; hd.data.materials.append(cer); bpy.ops.object.shade_smooth(); hd.parent = mug
+hd = bpy.context.active_object; hd.data.materials.append(cer); bpy.ops.object.shade_smooth()
+hd.parent = mug; hd.matrix_parent_inverse = mug.matrix_world.inverted()      # ручка остаётся там, где создана
 bpy.ops.mesh.primitive_cylinder_add(radius=0.0364, depth=0.002, location=(0, 0, 0.078), vertices=64)
-cf = bpy.context.active_object; cf.data.materials.append(coffee); cf.parent = mug
-mug.location = (-0.22, 0.52, 0); mug.rotation_euler = (0, 0, math.radians(-35))
+cf = bpy.context.active_object; cf.data.materials.append(coffee)
+cf.parent = mug; cf.matrix_parent_inverse = mug.matrix_world.inverted()      # кофе — внутри, на 14 мм ниже края
+mug.location = (-0.10, 0.62, 0.046); mug.rotation_euler = (0, 0, math.radians(-35))   # центр кружки на 46 мм — дно на столе
 
 
 # ---------------- свет ----------------
@@ -281,14 +305,43 @@ CAMS = {
     "2": dict(loc=(0.12, 0.66, 0.27), tgt=(-0.03, 0.0, 0.08), lens=32, f=4.0),
     "3": dict(loc=(-0.52, -0.50, 0.52), tgt=(0.04, -0.03, 0.06), lens=38, f=4.5),
 }
+if MINI:   # мини втрое меньше по объёму — камеры ближе, кадр «как с телефона над столом»
+    CAMS = {
+        "1": dict(loc=(0.44, -0.30, 0.13), tgt=(0.05, -0.02, 0.05), lens=50, f=2.8),
+        "2": dict(loc=(0.42, 0.38, 0.19), tgt=(0.05, 0.0, 0.07), lens=40, f=3.5),
+        "3": dict(loc=(-0.48, -0.46, 0.46), tgt=(0.02, 0.04, 0.03), lens=30, f=5.6),
+    }
 cams = {}
 for k, c in CAMS.items():
     cd = bpy.data.cameras.new(f"Камера {k}"); cd.lens = c["lens"]
     cd.dof.use_dof = True; cd.dof.aperture_fstop = c["f"]
     co = bpy.data.objects.new(f"Камера {k}", cd); scene.collection.objects.link(co)
+    c = dict(c, loc=tuple(Vector(c["loc"]) + OFF), tgt=tuple(Vector(c["tgt"]) + OFF))
     co.location = c["loc"]; co.rotation_euler = (Vector(c["tgt"]) - Vector(c["loc"])).to_track_quat("-Z", "Y").to_euler()
     cd.dof.focus_distance = (Vector(c["tgt"]) - Vector(c["loc"])).length
     cams[k] = co
+
+# ---------------- проверка реализма: предметы не пересекаются, ничего не висит и не утоплено в стол ----------------
+def _top_level():
+    out = {}
+    for o in scene.objects:
+        if o.parent is None and o.type in ("EMPTY", "MESH") and o.name not in ("Стол", "лампа") and not o.name.startswith("Камера"):
+            kids = [c for c in o.children_recursive if c.type == "MESH"] + ([o] if o.type == "MESH" else [])
+            if kids: out[o.name] = bbox(kids)
+    return out
+bpy.context.view_layer.update()
+_bb = _top_level()
+for a_, (amn, amx) in _bb.items():
+    if amn.z < -0.0015: print(f"ВНИМАНИЕ: {a_} ниже стола на {(-amn.z) * 1000:.1f} мм")
+names_ = list(_bb)
+for i in range(len(names_)):
+    for j in range(i + 1, len(names_)):
+        (amn, amx), (bmn, bmx) = _bb[names_[i]], _bb[names_[j]]
+        ov = [min(amx[k], bmx[k]) - max(amn[k], bmn[k]) for k in range(3)]
+        pair = {names_[i].split(".")[0], names_[j].split(".")[0]}
+        if pair in ({"стакан", "карандаш 1"}, {"стакан", "карандаш 2"}, {"карандаш 1", "карандаш 2"}, {"стопка A4", "синяя ручка"},
+                    {"жёлтый блокнот", "красная ручка"}): continue       # так и задумано: в стакане, на блокноте
+        if min(ov) > 0.002: print(f"пересечение габаритов: {names_[i]} × {names_[j]}: {[round(v * 1000) for v in ov]} мм")
 
 # ---------------- рендер ----------------
 scene.render.engine = "CYCLES"
@@ -319,6 +372,7 @@ for variant in VARIANTS:
         o.hide_render = not show
     for view in VIEWS:
         scene.camera = cams[view]
-        scene.render.filepath = os.path.join(D, f"Харви_{'открытый' if variant == 'tech' else 'мягкий'}_{view}.png")
+        name = f"Мини_{view}.png" if MINI else f"Харви_{'открытый' if variant == 'tech' else 'мягкий'}_{view}.png"
+        scene.render.filepath = os.path.join(D, name)
         bpy.ops.render.render(write_still=True)
         print("Рендер:", scene.render.filepath, flush=True)
