@@ -327,13 +327,13 @@ def electronics():
     e["батарея 2S 18650"] = cyl(65, 9.3, 0, -9.4, -3.5, "x") + cyl(65, 9.3, 0, 9.4, -3.5, "x")      # 2 банки рядом, вдоль x
     e["Pi Zero 2 W"] = boxr(-32.5, 32.5, -15, 15, 6.5, 8.0) + boxr(-26, 26, -12, -7, 8.0, 14.0)       # плата + гребёнка
     e["RP2350-Zero"] = boxr(-20, 3.5, -9, 9, 15.0, 19.0)                                              # над Pi Zero
-    e["DC-DC 6 В 6 А"] = boxr(34, 43, -17, 0, -12.5, -4.5)
-    e["DC-DC 5 В"] = boxr(34, 43, 2, 15, -12.5, -6.5)
+    e["DC-DC 6 В ≥ 6 А"] = boxr(33, 50.5, -11.5, 11.5, -12.5, -3.5)        # модуль ~17 × 23 × 9 мм между гнёздами плеч
+    e["DC-DC 5 В 3 А"] = boxr(34, 47, -7.5, 7.5, -2.5, 3.5)
     e["BMS 2S + заряд"] = boxr(-47.5, -34, -16, 16, -12.5, -8.0)
     e["микрофоны + усилитель"] = boxr(-47.5, -34, -16, 2, -7, -3.0)
     e["IMU + INA226"] = boxr(-47.5, -38, 4, 16, -7, -3.0)
     e["камера Module 3"] = CAMERA_BOX
-    e["динамик Ø20"] = cyl(5.0, 10.0, -38, 0, 17.0)
+    e["динамик Ø20"] = cyl(5.0, 10.0, -32, 0, 17.0)
     return e
 
 
@@ -348,6 +348,7 @@ def edge_sensors():
 
 
 BELLY_Y = (16.0, -16.0)          # середины контактных пластин на дне
+LID_SCREWS = ((-46.0, 0.0), (-20.0, 40.5), (-20.0, -40.5), (49.0, 0.0))   # винты крышки M2 во вставки ванны — там, где нет приводов
 DOCK_H = 4.0                     # высота площадки станции
 POGO_TOP = 11.0                  # верх подпружиненных контактов в свободном состоянии (ход 1,5 мм)
 REST_DROP = 13.0                 # на станции Харви опускает корпус на 13 мм: кронштейны ног ещё в 2 мм над столом
@@ -382,6 +383,26 @@ def dock_tower():
 
 
 @functools.lru_cache(None)
+def leg_stand():
+    """Стенд одной ноги для первых тестов: гнездо привода поворота (как в корпусе) на высоте стойки,
+    основание позади — нога свободно ходит вперёд ±30° и упирается стопой в стол. Крепится к столу 2 струбцинами
+    или 2 шурупами. Печать — основанием на стол, поддержки под гнездо."""
+    zj = G["tib"] - G["fem"] * math.sin(math.radians(20))
+    sock = boxr(X0 - 2.2, 0.0, -ST / 2 - 2.2, ST / 2 + 2.2, -HALF - 1.0, HALF + 0.5)   # спереди открыто — как стенка корпуса по оси
+    m = place(sock, COLS_ZD, (0, 0, zj))
+    for y in (S["holes_y"], -S["holes_y"]):           # винты M2 снизу в рабочий торец привода (через дно гнезда)
+        for x in S["holes_x"][:2]:
+            m -= cyl(6, S["m2"] / 2, x, y, zj - HALF - 0.5)
+    m += boxr(X0 - 2.2, -12.0, -ST / 2 - 2.2, ST / 2 + 2.2, 0, zj)            # колонна под гнездом (позади оси)
+    m += boxr(-70, -12.0, -35, 35, 0, 4)                                        # основание
+    m += Manifold.batch_hull([boxr(-30, -12.0, -3, 3, 4, 4.01), boxr(X0 - 2.2, -12.0, -3, 3, zj - 10, zj - 9.99)])   # косынка
+    m -= servo_at(COLS_ZD, (0, 0, zj))
+    for x, y in ((-60, 25), (-60, -25)):
+        m -= cyl(10, 2.3, x, y, 2)                                              # шурупы в доску
+    return m
+
+
+@functools.lru_cache(None)
 def chassis():
     """Корпус-ванна: дно, стенки, гнёзда шести приводов ног, двух плеч и двух глаз, стойки под платы,
     контакты зарядки снизу. Печать — дном на стол. Сверху — крышка (lid)."""
@@ -400,7 +421,14 @@ def chassis():
         m -= sv                                                      # гнездо точно по приводу (зазор — в допуске печати)
     for n in G["mounts"]:          # проход под качалки и кронштейны ног снизу
         m -= _leg_tf(n, cyl(20, 9.0, 0, 0, z0 - 1.0))
+        for y in (S["holes_y"], -S["holes_y"]):        # 4 винта M2 снизу в рабочий торец привода поворота
+            for x in S["holes_x"][:2]:
+                m -= _leg_tf(n, cyl(6, S["m2"] / 2, x, y, -HALF - 0.5))
     m -= cyl(6, 5.0, x1 - 1.0, 0, 8.5, "x")          # окно объектива камеры
+    for x, y in LID_SCREWS:                           # стойки Ø6 с отверстием под латунную вставку M2 × 3 (Ø3,2)
+        cx = min(max(x, x0 + 3.0), x1 - 3.0); cy = min(max(y, y0 + 3.0), y1 - 3.0)
+        top = z1 - 4.0; bottom = top - 8.0
+        m += cyl(top - bottom, 3.0, cx, cy, (top + bottom) / 2) - cyl(5, 1.6, cx, cy, top - 2.0)
     # контакты зарядки: две латунные пластины 40 × 12 мм на дне (в пазах 0,8 мм), «+» слева, «−» справа
     for y in BELLY_Y:
         m -= boxr(-20, 20, y - 6, y + 6, z0 - 1, z0 + 0.8)
@@ -420,11 +448,11 @@ def lid():
         m -= sv
     for i in range(-2, 3):
         for j in range(-2, 3):
-            m -= cyl(10, 0.9, -38 + 3.2 * i, 3.2 * j, z1)
+            m -= cyl(10, 0.9, -32 + 3.2 * i, 3.2 * j, z1)
     for sd in "LR":                                   # площадки под приводы глаз (привод лежит на крышке)
         b = eye_servos()[sd].bounding_box()
         m += boxr(b[0] + 1.5, b[3] - 1.5, b[1] + 1.0, b[4] - 1.0, z1 - 0.01, b[2] + 0.01) if b[2] > z1 else Manifold()
-    for x, y in ((x0 + 5, y0 + 5), (x0 + 5, y1 - 5), (x1 - 5, y0 + 5), (x1 - 5, y1 - 5)):
+    for x, y in LID_SCREWS:
         m -= cyl(10, 1.15, x, y, z1)
     return m
 
@@ -617,9 +645,9 @@ PRINTED = {   # деталь: (функция, сколько штук, мате
     "foot": (foot, 6, "TPU"), "yaw_bracket": (yaw_bracket, 2, "PLA"), "upper_arm": (upper_arm, 2, "PLA"),
     "forearm": (forearm, 2, "PLA"), "fixed_jaw": (lambda: fixed_jaw(1), 2, "PLA"), "moving_jaw": (lambda: moving_jaw(1), 2, "PLA"),
     "eye_stalk": (lambda: eye_stalk(1), 2, "PLA"), "chassis": (chassis, 1, "PLA"), "lid": (lid, 1, "PLA"),
-    "dock_pad": (dock_pad, 1, "PLA"), "dock_tower": (dock_tower, 1, "PLA"),
+    "dock_pad": (dock_pad, 1, "PLA"), "dock_tower": (dock_tower, 1, "PLA"), "leg_stand": (leg_stand, 1, "PLA"),
 }
-PARTS_G = {"STS3032 × 28": 28 * 20.0, "2 × 18650": 2 * 47.0, "Pi Zero 2 W": 11.0, "RP2350-Zero": 3.0, "DC-DC 6 В + 5 В": 14.0,
+PARTS_G = {"STS3032 × 28": 28 * 20.0, "2 × 18650": 2 * 47.0, "Pi Zero 2 W": 11.0, "RP2350-Zero": 3.0, "DC-DC 6 В + 5 В": 18.0,
            "BMS + заряд 2S": 6.0, "IMU + INA226": 3.0, "камера Module 3 Wide": 4.0, "микрофоны + усилитель": 4.0, "динамик Ø20": 6.0,
            "6 × VL53L4CD": 9.0, "2 дисплея 0,71″": 10.0, "провода и разъёмы": 25.0, "винты M2, контакты зарядки": 18.0, "накладки TPU": 2.0}
 
@@ -627,7 +655,7 @@ PARTS_G = {"STS3032 × 28": 28 * 20.0, "2 × 18650": 2 * 47.0, "Pi Zero 2 W": 11
 def printed_mass():
     out = {}
     for k, (fn, n, mat) in PRINTED.items():
-        if k.startswith("dock"): continue                     # станция — не на роботе
+        if k.startswith("dock") or k == "leg_stand": continue   # станция и стенд — не на роботе
         v = fn().volume()
         out[k] = round(v * (TPU if mat == "TPU" else PLA * INFILL) * n, 1)
     return out
@@ -652,6 +680,21 @@ def check_dock(verbose=True):
                      "зазор брюхо — контакты мм": round(zj + G["body"][4] - POGO_TOP, 1)}
     if verbose: print("станция:", out)
     return out
+
+
+def check_stand(verbose=True):
+    """Стенд ноги: нога во всех рабочих позах не задевает стенд; в стойке стопа на столе."""
+    zj = G["tib"] - G["fem"] * math.sin(math.radians(20))
+    st = leg_stand(); hits = 0
+    for qf, qk in LEG_POSES:
+        for qc in LEG_QC:                       # правило 3: поворот ±20°
+            a = leg_assembly("LM", 0, qf, qk)   # стенд — в системе ноги: перенесём ногу в начало
+            x, y, yaw = G["mounts"]["LM"]
+            parts = [m.translate([-x, -y, 0]).rotate([0, 0, -yaw + qc]).translate([0, 0, zj]) for p_ in a.values() for _, m in p_]
+            v = inter(U(parts), st)
+            if v > 0.5: hits += 1
+    if verbose: print(f"стенд ноги: {hits} столкновений из {len(LEG_POSES) * len(LEG_QC)} поз")
+    return hits
 
 
 def leg_pose_for_drop(dz):
@@ -732,7 +775,7 @@ if __name__ == "__main__":
     fast = "--fast" in sys.argv
     print(json.dumps(mass_report(), ensure_ascii=False, indent=1))
     hits = check(fast)
-    check_dock()
+    check_dock(); check_stand()
     if not fast:
         print("STL:", export_stl())
         print("для симуляции:", export_sim(os.path.join(HERE, "..", "..", "код", "симуляция", "мини", "assets")))

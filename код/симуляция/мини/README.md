@@ -23,7 +23,7 @@ python harvey_mini.py
 
 После правок CAD сначала запустите `C:\venvs\harvey-cad\Scripts\python.exe модели/мини/harvey_mini_parts.py` — это обновит `assets/`.
 
-## Результаты (масса 889 г из CAD)
+## Результаты (масса 893 г из CAD)
 
 | Проверка | Итог |
 | --- | --- |
