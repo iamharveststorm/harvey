@@ -40,7 +40,7 @@ A1, FORE = G["a1"] * mm, G["fore"] * mm
 GX, GY = CAD["GX"] * mm, CAD["GY"] * mm
 JAW_MID, JAW_END = GX + 0.015, GX + 0.026            # середина и конец губок вдоль кисти
 EYE = {s: tuple(v * mm for v in G["eye"][s]) for s in "LR"}
-TUCK_Q = (0.0, 15.0, -115.0)                           # «поджато» (градусы) — как CLAW_TUCK в CAD
+TUCK_Q = (8.0, 50.0, -130.0)                           # «поджато» (градусы) — как CLAW_TUCK в CAD: не загораживает камеру
 
 
 def torso_mass():

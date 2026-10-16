@@ -14,13 +14,16 @@
     W / S — вперёд / назад      A / D — повернуть      Q / E — шаг вбок      F — быстрый / обычный шаг
     R — присесть / встать (для работы клешнями на столе)        Z — лечь на брюхо / встать
     Клешни: B — какая (левая / правая / обе); I / K — вперёд / назад, J / L — влево / вправо, U / O — вверх / вниз
-            N — раскрыть губки, M — сжать; 1 — поджать, 2 — к столу, 3 — помахать, 4 — подать вперёд-вверх
+            N / M — раскрывать / сжимать губки (пока зажато); , / . — слабее / сильнее сжимать (предел момента)
+            1 — поджать, 2 — к столу, 3 — помахать, 4 — подать вперёд-вверх
     T — взять ручку или карандаш перед клешнёй (подойдите так, чтобы предмет лежал вдоль клешни)
     H — домой: дойти до станции и лечь на контакты (на роботе — по метке AprilTag; здесь — по положению)
     7 / 8 / 9 — глаза: грусть / интерес / радость        G — защита края стола вкл/выкл
+    V — вид глазами Харви (его камера: то, что попадает в кадр Module 3 Wide) / обычный вид
+    [ / ] — посмотреть вниз / вверх: камера неподвижна в корпусе, наклоняется весь корпус ногами (до ±12°)
     C — показать физические формы        0 — начать заново        X / Esc — выход
 Мышь в фото-окне: левая кнопка — вращать камеру, правая или колесо — приблизить."""
-import math, sys, os, time, threading
+import math, sys, os, time, threading, re
 try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
@@ -35,6 +38,7 @@ for p_ in (HERE, WORLD_DIR):
 import harvey_mini as H
 import harvey_world as W
 import harvey_terrain as TR
+import mini_objects as MO
 
 DT = H.DT
 DOCK = (-0.25, -0.15)                      # центр площадки станции на столе; Харви заходит на неё по +x
@@ -47,13 +51,35 @@ def world_model():
     """Стол «Компакта» (реальный масштаб, PBR), предметы, салфетка, станция; детали робота из CAD."""
     geoms = "\n    ".join(W.world_geoms())
     props = W.props_xml().replace(TR.stones_xml(), "")
+    props = re.sub(r'<body name="(pen|pen2|pencil)" .*?</body>', "", props)            # упрощённые капсулы мира «Компакта» —
+    props += MO.bodies()                                                                 # заменить настоящими ручками и карандашом
     xml = H.build_xml(napkin=True, world_xml=geoms + W.LIGHTS + props, visual=True, dock=True, dock_pos=DOCK)
     xml = xml.replace('<visual><global offwidth="1920" offheight="1080"/><quality shadowsize="4096"/></visual>',
-                      W.VISUAL + W.asset_xml(robot=False))
+                      W.VISUAL + W.asset_xml(robot=False).replace("</asset>", MO.assets() + "</asset>", 1))
+    def tpu_pad(mt):                                                                     # накладки губок TPU: приоритет 2 —
+        g = mt.group(0).replace('friction="1.2 0.02 0.002"', 'friction="0.9 0.02 0.002"')  # их трение решает в губках
+        return g.replace("<geom ", '<geom priority="2" condim="6" ', 1)
+    xml = re.sub(r'<geom name="[LR]_jaw(?:fix|mov)"[^>]*>', tpu_pad, xml)
     xml = xml.replace('<light pos="0.2 -0.3 1" dir="-0.2 0.3 -1" castshadow="true"/>', "")
+    # трение без «ползучести»: эллиптический конус и коррекция проскальзывания — предмет в губках не сползает,
+    # пока сила трения больше веса (в мягкой модели по умолчанию лёгкие предметы медленно выползают из захвата)
+    xml = xml.replace('<option timestep="0.0005" integrator="implicitfast"/>',
+                      '<option timestep="0.0005" integrator="implicitfast" cone="elliptic" noslip_iterations="3"/>')
+    # камера Харви: Camera Module 3 Wide в передней стенке (CAD: объектив Ø9 на x = 61,5…66 мм, z = 8,5 мм над осями бедра);
+    # смотрит вперёд, поле зрения 67° по вертикали (≈ 100° по горизонтали в кадре 16 : 9) — как у настоящей
+    xml = xml.replace('<geom name="body" type="box"', CAMERA + '<geom name="body" type="box"', 1)
     assets = {k: v for k, v in W.load_assets().items() if k.startswith("world/")}
     assets.update(H.load_assets())
     return xml, assets
+
+
+CAMERA = '<camera name="harvey_eye" pos="0.0662 0 0.0085" xyaxes="0 -1 0 0 0 1" fovy="67"/>'
+
+
+def near_plane(m, near=0.003):
+    """Ближняя граница кадра 3 мм. В MuJoCo она задаётся долей размера сцены (комната ~13 м → ~3 см), и камера Харви
+    обрезала бы свои же клешни перед объективом."""
+    m.vis.map.znear = near / max(m.stat.extent, 1e-6)
 
 
 def yaw_of(q):
@@ -62,12 +88,15 @@ def yaw_of(q):
 
 class MiniTeleop:
     MOVE = {"W": (1, 0, 0), "S": (-0.7, 0, 0), "A": (0, 0, 1), "D": (0, 0, -1), "Q": (0, 0.7, 0), "E": (0, -0.7, 0)}
-    CLAW = {"I": (1, 0, 0), "K": (-1, 0, 0), "J": (0, 1, 0), "L": (0, -1, 0), "U": (0, 0, 1), "O": (0, 0, -1)}
+    CLAW = {"I": (1, 0, 0), "K": (-1, 0, 0), "J": (0, 1, 0), "L": (0, -1, 0), "U": (0, 0, 1), "O": (0, 0, -1),
+            "N": "open", "M": "close"}                       # губки — пока зажато (скорость привода захвата ~90°/с)
+    GRIP_RANGE = (math.radians(-50), math.radians(12))
 
     def __init__(self):
         xml, assets = world_model()
         self.sim = H.Mini(xml=xml, assets=assets)
         m, d = self.sim.m, self.sim.d
+        near_plane(m)
         self.world = True; self.show_phys = False
         self.tq_adr = m.jnt_qposadr[m.body("torso").jntadr[0]]; self.tv_adr = m.jnt_dofadr[m.body("torso").jntadr[0]]
         self.feet = [m.geom(f"{n}_foot").id for n in H.MOUNTS]
@@ -81,12 +110,17 @@ class MiniTeleop:
         self.cmd = np.zeros(3); self.vel = np.zeros(3); self.held = set(); self.claw_held = set()
         self.fast = False; self.phase = 0.0; self.t = 0.0
         self.dz = 0.0; self.dz_t = 0.0; self.pose = "стоит"
+        self.pitch = 0.0; self.pitch_t = 0.0                    # наклон корпуса (и камеры) ногами: + — нос вниз, рад
         self.claw_sel = "LR"; self.guard = True; self.macro = None; self.msg = "готов"
         tuck = tuple(math.radians(a) for a in H.TUCK_Q)
         self.claw_p = {s: H.arm_fk(s, tuck) for s in "LR"}
         self.arm_go = {}                                        # плавный переход в готовую позу: s → (q_from, q_to, k)
         self.eyes = {"L": 0.0, "R": 0.0}
         self.charging = False
+        self.grip_t = {s: math.radians(-20) for s in "LR"}      # цель привода захвата (упёрлись — давит с ограничением момента)
+        self.sim.grip_lim = 0.06                                 # ограничение момента захвата, Н·м (регистр Torque Limit у STS3032)
+        self.grip_info = {s: (0.0, None) for s in "LR"}
+        self.jaw_ids = {s: (self.sim.m.geom(f"{s}_jawfix").id, self.sim.m.geom(f"{s}_jawmov").id) for s in "LR"}
 
     def soft_reset(self):
         d = self.sim.d
@@ -109,6 +143,12 @@ class MiniTeleop:
             self.held.add(k); self.cmd = self._cmd_from(); self.msg = "иду"; return
         if k in self.CLAW:
             self.claw_held.add(k); return
+        if k in ("[", "]"):                                     # посмотреть вниз / вверх — наклонить корпус ногами (камера в корпусе)
+            self.pitch_t = float(np.clip(self.pitch_t + math.radians(4 if k == "[" else -4), math.radians(-12), math.radians(12)))
+            self.msg = f"наклон корпуса {math.degrees(self.pitch_t):+.0f}° ({'вниз' if self.pitch_t > 0 else 'вверх' if self.pitch_t < 0 else 'ровно'})"; return
+        if k in (",", "."):                                     # сила сжатия: ограничение момента привода захвата
+            self.sim.grip_lim = float(np.clip(self.sim.grip_lim + (0.01 if k == "." else -0.01), 0.01, 0.20))
+            self.msg = f"сила захвата: предел {self.sim.grip_lim:.2f} Н·м (≈ {self.sim.grip_lim / 0.015:.1f} Н на середине губок)"; return
         if k == " ": self.held.clear(); self.cmd[:] = 0; self.macro = None; self.msg = "стоп"
         elif k == "F": self.fast = not self.fast; self.cmd = self._cmd_from(); self.msg = "быстрый шаг" if self.fast else "обычный шаг"
         elif k == "R":
@@ -118,12 +158,6 @@ class MiniTeleop:
         elif k == "B":
             self.claw_sel = {"LR": "L", "L": "R", "R": "LR"}[self.claw_sel]
             self.msg = "клешня: " + {"L": "левая", "R": "правая", "LR": "обе"}[self.claw_sel]
-        elif k == "N":
-            for s in self.claw_sel: self.sim.q[f"{s}_g"] = math.radians(-45)
-            self.msg = "губки раскрыты"
-        elif k == "M":
-            for s in self.claw_sel: self.sim.q[f"{s}_g"] = 0.25
-            self.msg = "губки сжаты"
         elif k in "1234":
             self.preset(int(k))
         elif k == "T": self.macro = self._macro_pick(); self.msg = "беру…"
@@ -169,8 +203,13 @@ class MiniTeleop:
             self.claw_p[s] = H.arm_fk(s, tuple(q))
             if k >= 1.0: del self.arm_go[s]
             else: self.arm_go[s] = (qa, qb, k)
-        if self.claw_held:
-            dv = np.sum([self.CLAW[c] for c in self.claw_held], axis=0) * 0.06 * DT
+        for c in self.claw_held & {"N", "M"}:
+            for s in self.claw_sel:
+                self.grip_t[s] = float(np.clip(self.grip_t[s] + (1.5 if c == "M" else -1.5) * DT, *self.GRIP_RANGE))
+        for s in "LR": self.sim.q[f"{s}_g"] = self.grip_t[s]
+        moves = self.claw_held - {"N", "M"}
+        if moves:
+            dv = np.sum([self.CLAW[c] for c in moves], axis=0) * 0.06 * DT
             for s in self.claw_sel:
                 if s in self.arm_go: continue
                 v = dv.copy()
@@ -187,21 +226,47 @@ class MiniTeleop:
         n = int(sec / DT)
         for _ in range(n): yield
 
+    REAR_CLEAR = H.BX1 + 0.006            # задний конец предмета должен быть впереди корпуса (иначе брюхо придавит хвост)
+
+    def _object_line(self, o):
+        """Ось предмета в системе корпуса: (центр, направление, концы)."""
+        tb = self.sim.d.body("torso"); R = tb.xmat.reshape(3, 3); b = self.sim.d.body(o)
+        c = R.T @ (b.xpos - tb.xpos); u = R.T @ b.xmat.reshape(3, 3)[:, 0]
+        e0, e1 = MO.EXTENT[o]
+        return c, u, (c + u * e0, c + u * e1)
+
     def _macro_pick(self):
-        """Взять предмет перед выбранной клешнёй: присесть, губки сверху, сжать, встать, поднять на 6 см."""
-        s = "L" if self.claw_sel in ("L", "LR") else "R"
-        tb = self.sim.d.body("torso"); R = tb.xmat.reshape(3, 3)
+        """Взять ручку или карандаш перед выбранной клешнёй.
+        1. Найти предмет, который лежит вдоль клешни (±25°) и проходит под ней.
+        2. Если задний конец уходит под корпус — отступить назад (иначе при подъёме предмет упрётся в брюхо и выскочит).
+        3. Присесть, губки сверху на 12 см перед осями, сжать с пределом момента, встать, поднять на 6 см."""
+        s = "L" if self.claw_sel in ("L", "LR") else "R"; cy = H.ARM_S[s][1]
         best = None
         for o in GRASPABLE:
-            b = self.sim.d.body(o); p = R.T @ (b.xpos - tb.xpos)
-            ax = R.T @ b.xmat.reshape(3, 3)[:, 0]; ang = abs(math.degrees(math.atan2(ax[1], ax[0])))
-            ang = min(ang, 180 - ang)
-            if 0.085 < p[0] < 0.150 and abs(p[1] - H.ARM_S[s][1]) < 0.022 and ang < 25:
-                best = (o, p)
+            c, u, ends = self._object_line(o)
+            ang = abs(math.degrees(math.atan2(u[1], u[0]))); ang = min(ang, 180 - ang)
+            if ang > 25 or abs(u[0]) < 1e-3: continue
+            t = (0.120 - c[0]) / u[0]; q = c + u * t                     # точка оси предмета на x = 120 мм
+            if not (MO.EXTENT[o][0] + 0.012 < t < MO.EXTENT[o][1] - 0.012): continue
+            if abs(q[1] - cy) < 0.020 and min(e[0] for e in ends) < 0.30:
+                best = o
         if best is None:
-            self.msg = "нет ручки перед клешнёй: подойдите, чтобы она лежала вдоль клешни"; return
-        o, p = best
-        self.sim.q[f"{s}_g"] = math.radians(-45); self.dz_t = 0.016; self.pose = "присел"
+            self.msg = "нет ручки или карандаша перед клешнёй: подойдите, чтобы предмет лежал вдоль клешни"; return
+        o = best
+        # 2. отступить, пока задний конец под корпусом (не дальше 12 см)
+        for _ in range(int(6.0 / DT)):
+            c, u, ends = self._object_line(o)
+            rear = min(e[0] for e in ends)
+            if rear > self.REAR_CLEAR + 0.006: break                 # с запасом: при остановке корпус доезжает вперёд ~2 мм
+            self.msg = f"отступаю: конец предмета под корпусом ({rear * 1000:.0f} мм)"
+            self.cmd = np.array([-0.03, 0.0, 0.0]); yield
+        self.cmd[:] = 0
+        yield from self._wait(0.5)
+        c, u, ends = self._object_line(o)
+        if min(e[0] for e in ends) <= self.REAR_CLEAR - 0.003 or abs(((c + u * ((0.120 - c[0]) / u[0])))[1] - cy) > 0.022:
+            self.msg = "не дотянуться: предмет ушёл из-под клешни"; return
+        self.msg = f"беру {MO.NAME_RU.get(o, o)}…"
+        self.grip_t[s] = math.radians(-45); self.dz_t = 0.016; self.pose = "присел"
         yield from self._wait(0.8)
         def move(a, b, sec):
             n = int(sec / DT)
@@ -212,17 +277,20 @@ class MiniTeleop:
                 yield
         def body_pt(pw):
             tb_ = self.sim.d.body("torso"); return tb_.xmat.reshape(3, 3).T @ (np.array(pw) - tb_.xpos)
-        pw = self.sim.d.body(o).xpos.copy()
+        c, u, _ = self._object_line(o)
+        tb = self.sim.d.body("torso"); R = tb.xmat.reshape(3, 3)
+        grab = c + u * ((0.118 - c[0]) / u[0])                            # точка захвата на оси предмета
+        gw = tb.xpos + R @ grab                                           # в мире
         a = H.arm_fk(s, tuple(self.sim.q[f"{s}_{j}"] for j in "ype"), H.JAW_END)
-        over = body_pt(pw + [0, 0, 0.030]); at = body_pt([pw[0], pw[1], 0.0016])
+        over = body_pt(gw + [0, 0, 0.030]); at = body_pt([gw[0], gw[1], 0.0016])
         yield from move(a, over, 1.0); yield from move(over, at, 0.8)
-        self.sim.q[f"{s}_g"] = 0.25; yield from self._wait(0.6)
+        self.grip_t[s] = self.GRIP_RANGE[1]; yield from self._wait(0.6)     # сжать до упора в предмет — давит с пределом момента
         self.dz_t = 0.0; self.pose = "стоит"; yield from self._wait(0.6)
         cur = H.arm_fk(s, tuple(self.sim.q[f"{s}_{j}"] for j in "ype"), H.JAW_END)
-        up = body_pt(pw + [0, 0, 0.060]); yield from move(cur, up, 1.0)
+        up = body_pt(gw + [0, 0, 0.060]); yield from move(cur, up, 1.2)
         self.claw_p[s] = H.arm_fk(s, tuple(self.sim.q[f"{s}_{j}"] for j in "ype"))
         lifted = self.sim.d.body(o).xpos[2] > 0.03
-        self.msg = f"{'держит' if lifted else 'не удержал'}: {o}"
+        self.msg = ("держит " if lifted else "не удержал ") + MO.NAME_RU.get(o, o)
 
     def _macro_dock(self):
         """Домой: к точке в 16 см перед станцией, развернуться по оси, зайти, лечь на контакты."""
@@ -266,6 +334,25 @@ class MiniTeleop:
                 return True
         return False
 
+    def _grip_sense(self):
+        """Что зажато и с какой силой (сумма нормальных сил на подвижную губку) — как «нагрузка» привода захвата."""
+        m, d = self.sim.m, self.sim.d; f6 = np.zeros(6)
+        for s in "LR":
+            fx, mv = self.jaw_ids[s]; touch = {fx: set(), mv: set()}; F = 0.0
+            for i in range(d.ncon):
+                c = d.contact[i]
+                for jaw in (fx, mv):
+                    other = c.geom2 if c.geom1 == jaw else (c.geom1 if c.geom2 == jaw else None)
+                    if other is None: continue
+                    touch[jaw].add(m.geom_bodyid[other])
+                    if jaw == mv:
+                        mujoco.mj_contactForce(m, d, i, f6); F += abs(f6[0])
+            name = None
+            for b in touch[fx] & touch[mv]:
+                nm = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_BODY, b)
+                if nm and not nm.startswith(("L_", "R_", "torso")): name = nm
+            self.grip_info[s] = (F, name)
+
     def _contacts_charging(self):
         d = self.sim.d; f6 = np.zeros(6); F = [0.0, 0.0]
         if d.ncon == 0: return False
@@ -287,6 +374,7 @@ class MiniTeleop:
                 if self.vel[axis] * sign > 1e-4 and int(self.t / DT) % 20 == 0 and self.edge_seen(axis, sign):
                     self.vel[axis] = 0; self.cmd[axis] = 0; self.held.clear(); self.msg = f"край стола {name} — стоп"
         self.dz += float(np.clip(self.dz_t - self.dz, -0.02 * DT, 0.02 * DT))
+        self.pitch += float(np.clip(self.pitch_t - self.pitch, -math.radians(30) * DT, math.radians(30) * DT))
         moving = np.linalg.norm(self.vel) > 1e-3
         if moving: self.phase = (self.phase + DT / (2 * t_half)) % 1.0
         h0 = -(H.ZJ - H.FOOT_R) + self.dz
@@ -299,14 +387,15 @@ class MiniTeleop:
                     s_ = (pp - 0.5) * 2; u = -0.5 + (s_ - math.sin(2 * math.pi * s_) / (2 * math.pi)); z = 0.015 * math.sin(math.pi * s_)
             a = self.vel[2] * t_half * u; c, sn = math.cos(a), math.sin(a)
             p = np.array([c * p0[0] - sn * p0[1], sn * p0[0] + c * p0[1]]) + self.vel[:2] * t_half * u
-            for j, v in zip("cfk", H.leg_ik(n, p, h0 + z)): self.sim.q[f"{n}_{j}"] = v
+            hp = math.tan(self.pitch) * p[0]                     # нос вниз: передние стопы ближе к корпусу, задние — дальше
+            for j, v in zip("cfk", H.leg_ik(n, p, h0 + z + hp)): self.sim.q[f"{n}_{j}"] = v
         self._arm_step()
         for s in "LR": self.sim.q[f"{s}_s"] = math.radians(self.eyes[s])
         self.sim.step(record=False)
         # батарея: 28 приводов (ток по моменту) + Pi Zero, дисплеи, датчики; заряд на станции 12 Вт
         I = float(np.sum(np.abs(self.sim.d.ctrl))) / KT + 28 * 0.015
         self.energy -= (6.0 * I / 0.9 + 1.8) * DT
-        if int(self.t / DT) % 50 == 0: self.charging = self._contacts_charging()
+        if int(self.t / DT) % 50 == 0: self.charging = self._contacts_charging(); self._grip_sense()
         if self.charging: self.energy = min(CAP_J, self.energy + 12.0 * DT)
         self.t += DT
 
@@ -314,9 +403,15 @@ class MiniTeleop:
         tb = self.sim.d.body("torso"); v = np.linalg.norm(self.vel[:2]) * 100
         tilt = self.sim.tilt(); soc = 100 * self.energy / CAP_J
         sel = {"L": "левая", "R": "правая", "LR": "обе"}[self.claw_sel]
+        grip = ""
+        for s in "LR":
+            F, o = self.grip_info[s]
+            if o:
+                grip += "  " + ("Л" if s == "L" else "П") + f": держит {MO.NAME_RU.get(o, o)} ({MO.MASS_G.get(o, 0):.0f} г), сжатие {F:.1f} Н"
+        grip += f"  [захват до {self.sim.grip_lim:.2f} Н·м]"
         return (f"t={self.t:5.1f} с  скорость {v:3.1f} см/с  наклон {tilt:3.1f}°  {self.pose}  клешня: {sel}  "
                 f"заряд {soc:3.0f} %{' (заряжается)' if self.charging else ''}{'  НИЗКИЙ ЗАРЯД — H' if soc < 15 else ''}"
-                f"{'' if self.guard else '  [край не охраняется]'}  — {self.msg}")
+                f"{'' if self.guard else '  [край не охраняется]'}{grip}  — {self.msg}")
 
 
 # ---------------- физика в отдельном процессе (для фото-окна) ----------------
@@ -348,7 +443,7 @@ class RemoteMini:
     def __init__(self):
         import multiprocessing as mp
         xml, assets = world_model()
-        self.sim = H.Mini(xml=xml, assets=assets); self.world = True
+        self.sim = H.Mini(xml=xml, assets=assets); self.world = True; near_plane(self.sim.m)
         ctx = mp.get_context("spawn")
         self.qpos = ctx.RawArray("d", self.sim.m.nq); self.seq = ctx.RawValue("l", 0)
         self.st = ctx.RawArray("c", 2048); self.flags = ctx.RawArray("i", 4); self.cmd = ctx.Queue()
@@ -384,10 +479,12 @@ def keyname(e):
     if sys.platform == "win32" and e.keycode:              # коды Windows не зависят от раскладки
         k = e.keycode
         if 65 <= k <= 90 or 48 <= k <= 57: return chr(k)
-        return {32: " ", 27: "ESC"}.get(k, "")
+        return {32: " ", 27: "ESC", 188: ",", 190: ".", 219: "[", 221: "]"}.get(k, "")
     ks = (e.keysym or "").lower()
     if ks == "space": return " "
     if ks == "escape": return "ESC"
+    if ks in ("comma", "period"): return "," if ks == "comma" else "."
+    if ks in ("bracketleft", "bracketright"): return "[" if ks == "bracketleft" else "]"
     return ks.upper() if len(ks) == 1 else ""
 
 
@@ -401,8 +498,8 @@ def run_gui(photo=True, script=None):
         tp = RemoteMini(); v = PH.PhotoView(root, tp.sim.m, tp.sim.d, title="Харви мини — фото (Filament, PBR)")
         v.cam.distance = 0.42; v.cam.elevation = -20; v.cam.azimuth = 200
     else:
-        import mujoco.viewer
-        tp = MiniTeleop(); v = mujoco.viewer.launch_passive(tp.sim.m, tp.sim.d, show_left_ui=False, show_right_ui=False)
+        from mujoco import viewer as mjviewer
+        tp = MiniTeleop(); v = mjviewer.launch_passive(tp.sim.m, tp.sim.d, show_left_ui=False, show_right_ui=False)
         v.cam.distance = 0.42; v.cam.elevation = -20; v.cam.azimuth = 200
     state = {"run": True}
     def close():
@@ -414,27 +511,39 @@ def run_gui(photo=True, script=None):
             b.bind("<ButtonPress-1>", lambda e: tp.key(hold, hold=True)); b.bind("<ButtonRelease-1>", lambda e: tp.release(hold))
         else: b.configure(command=cmd)
         return b
+    view = {"eye": False, "free": None}
+    cam_id = mujoco.mj_name2id(tp.sim.m, mujoco.mjtObj.mjOBJ_CAMERA, "harvey_eye")
+    def toggle_view():
+        view["eye"] = not view["eye"]
+        if view["eye"]:
+            view["free"] = (v.cam.distance, v.cam.azimuth, v.cam.elevation)
+            v.cam.type = int(mujoco.mjtCamera.mjCAMERA_FIXED); v.cam.fixedcamid = cam_id
+        else:
+            v.cam.type = int(mujoco.mjtCamera.mjCAMERA_FREE)
+            if view["free"]: v.cam.distance, v.cam.azimuth, v.cam.elevation = view["free"]
     rows = [("Ходьба (зажмите)", [("Q ↖ вбок", None, "Q"), ("W ↑", None, "W"), ("E вбок ↗", None, "E"),
                                   ("A ⟲", None, "A"), ("Стоп", " ", None), ("D ⟳", None, "D"),
                                   ("F быстро", "F", None), ("S ↓", None, "S"), ("R присесть", "R", None)]),
             ("Клешни", [("1 поджать", "1", None), ("2 к столу", "2", None), ("3 помахать", "3", None),
                         ("4 подать", "4", None), ("T взять ручку", "T", None), ("B выбрать", "B", None),
-                        ("N раскрыть", "N", None), ("M сжать", "M", None), ("Z лечь", "Z", None)]),
+                        ("N раскрыть", None, "N"), ("M сжать", None, "M"), ("Z лечь", "Z", None),
+                        (", слабее", ",", None), (". сильнее", ".", None)]),
             ("Клешня вручную (зажмите)", [("I вперёд", None, "I"), ("U вверх", None, "U"), ("J влево", None, "J"),
                                           ("K назад", None, "K"), ("O вниз", None, "O"), ("L вправо", None, "L")]),
-            ("Харви", [("H домой", "H", None), ("7 грусть", "7", None), ("8 интерес", "8", None),
+            ("Харви", [("V глазами Харви", "V", None), ("[ смотреть вниз", "[", None), ("] смотреть вверх", "]", None), ("H домой", "H", None), ("7 грусть", "7", None), ("8 интерес", "8", None),
                        ("9 радость", "9", None), ("G край", "G", None), ("0 заново", "0", None)])]
     r = 0
     for title, btns in rows:
         tk.Label(root, text=title, bg=BG, font=("Segoe UI", 10, "bold")).grid(row=r, column=0, pady=(8, 2)); r += 1
         f = tk.Frame(root, bg=BG); f.grid(row=r, column=0, padx=8); r += 1
         for i, (t, k, hold) in enumerate(btns):
-            mk(f, t, (lambda k=k: tp.key(k)) if k else None, hold).grid(row=i // 3, column=i % 3)
+            mk(f, t, (lambda k=k: toggle_view() if k == "V" else tp.key(k)) if k else None, hold).grid(row=i // 3, column=i % 3)
     status = tk.Label(root, text="", bg=BG, justify="left", wraplength=340, font=("Segoe UI", 9)); status.grid(row=r, column=0, padx=8, pady=8, sticky="w")
     pressed_at = {}
     def press(e):
         c = keyname(e)
         if c in ("ESC", "X"): close(); return
+        if c == "V": toggle_view(); return
         if c in tp.MOVE or c in tp.CLAW: pressed_at[c] = time.time(); tp.key(c, hold=True)
         elif c: tp.key(c)
     def release(e):
@@ -455,13 +564,14 @@ def run_gui(photo=True, script=None):
             with v.lock():
                 for _ in range(int(1 / 60 / DT)): tp.step()
         v.opt.geomgroup[1] = 1 if tp.show_phys else 0; v.opt.geomgroup[2] = 0 if tp.show_phys else 1
-        v.cam.lookat[:] = tp.sim.d.body("torso").xpos
+        if not view["eye"]: v.cam.lookat[:] = tp.sim.d.body("torso").xpos
         v.sync()
-        status.configure(text=tp.status() + (f"  [{v.fps:.0f} к/с]" if photo else ""))
+        status.configure(text=("[ВИД ГЛАЗАМИ ХАРВИ: камера Module 3 Wide, 67° × ~100°]  " if view["eye"] else "") + tp.status()
+                         + (f"  [{v.fps:.0f} к/с]" if photo else ""))
         root.after(max(1, int((1 / 60 - (time.time() - t0)) * 1000)), tick)
     if script:
         for t_, k in script:
-            root.after(int(t_ * 1000), (lambda k=k: close() if k == "quit" else tp.key(k)))
+            root.after(int(t_ * 1000), (lambda k=k: close() if k == "quit" else (toggle_view() if k == "V" else tp.key(k))))
     print(__doc__)
     root.after(50, tick); root.focus_force(); root.mainloop()
     try: root.destroy()
@@ -489,7 +599,7 @@ def run_test():
     pen = d.body("pen").xpos.copy()
     d.qpos[qa:qa + 3] = [pen[0] - 0.120, pen[1] - H.ARM_S["L"][1], H.ZJ + 0.003]; d.qpos[qa + 3:qa + 7] = [1, 0, 0, 0]; d.qvel[va:va + 6] = 0
     mujoco.mj_forward(tp.sim.m, d); go(0.8)
-    tp.key("B"); tp.key("T"); go(5.5); note("T — взять ручку")
+    tp.key("B"); tp.key("T"); go(9.0); note("T — взять ручку (с отступом назад)")
     pen_up = float(d.body("pen").xpos[2])
     tp.key("4"); go(1.5); note("4 — подать"); pen_give = float(d.body("pen").xpos[2])
     tp.soft_reset(); go(0.5)
@@ -504,10 +614,41 @@ def run_test():
     return res
 
 
+def run_grip_test():
+    """Захват по-настоящему: каждый предмет — подойти так, чтобы он лежал вдоль клешни, T (присесть, губки сверху,
+    сжать с пределом момента, встать, поднять на 6 см), подержать 2 с; слабая хватка — проскальзывает;
+    раскрыть губки — предмет падает и катится (гелевая ручка — круглая, катится; карандаш и ручка с клипом — нет)."""
+    out = {}
+    def place_robot(tp, o):
+        d = tp.sim.d; qa, va = tp.tq_adr, tp.tv_adr
+        b = d.body(o); ax = b.xmat.reshape(3, 3)[:, 0]; psi = math.atan2(ax[1], ax[0])
+        c, sn = math.cos(psi), math.sin(psi); p = b.xpos; off = np.array([0.120, H.ARM_S["L"][1]])   # как подошёл бы человек: предмет под клешнёй
+        d.qpos[qa:qa + 2] = [p[0] - (c * off[0] - sn * off[1]), p[1] - (sn * off[0] + c * off[1])]
+        d.qpos[qa + 2] = H.ZJ + 0.003; d.qpos[qa + 3:qa + 7] = [math.cos(psi / 2), 0, 0, math.sin(psi / 2)]; d.qvel[va:va + 6] = 0
+        mujoco.mj_forward(tp.sim.m, d)
+    def go(tp, sec):
+        for _ in range(int(sec / DT)): tp.step()
+    for o, lim in (("pen", 0.06), ("pen2", 0.06), ("pencil", 0.06), ("pen", 0.004), ("pen", 0.010)):
+        tp = MiniTeleop(); d = tp.sim.d
+        place_robot(tp, o); go(tp, 0.8)
+        tp.sim.grip_lim = lim; tp.key("B"); tp.key("T"); go(tp, 9.0)
+        z_lift = float(d.body(o).xpos[2]); tp._grip_sense(); F, held = tp.grip_info["L"]
+        go(tp, 2.0); z_hold = float(d.body(o).xpos[2])
+        p0 = d.body(o).xpos.copy(); tp.grip_t["L"] = math.radians(-45); go(tp, 2.5)
+        p1 = d.body(o).xpos
+        out[f"{o} @ {lim:.3f} Н·м"] = {"поднят_мм": round(z_lift * 1000), "через_2_с_мм": round(z_hold * 1000),
+                                     "сжатие_Н": round(F, 2), "в_губках": MO.NAME_RU.get(held, held),
+                                     "после_раскрытия_укатился_мм": round(float(np.linalg.norm(p1[:2] - p0[:2])) * 1000)}
+        print(o, lim, out[f"{o} @ {lim:.3f} Н·м"], flush=True)
+    return out
+
+
 if __name__ == "__main__":
-    if "--test" in sys.argv:
+    if "--grip-test" in sys.argv:
+        run_grip_test()
+    elif "--test" in sys.argv:
         run_test()
     elif "--gui-test" in sys.argv:
-        run_gui(photo="--classic" not in sys.argv, script=[(2.0, "3"), (4.0, "1"), (6.0, "quit")])
+        run_gui(photo="--classic" not in sys.argv, script=[(2.0, "3"), (4.0, "1"), (5.0, "V"), (6.0, "["), (6.2, "["), (6.4, "["), (9.0, "quit")])
     else:
         run_gui(photo="--classic" not in sys.argv)
