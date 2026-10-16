@@ -146,7 +146,8 @@ for s in ("L", "R"):                             # экраны глаз
             uv.data[li].uv = (0.5 + v.x / (2 * sc["radius"] * 0.001), 0.5 + v.y / (2 * sc["radius"] * 0.001))
     o.data.materials.append(image_mat(f"Глаз {s}", os.path.join(D, "tex", f"eye_{s}.png"), emit_k=2.2, rough=0.15))
     o.parent = rig
-rig.rotation_euler = (0, 0, math.radians(14 if not MINI else 18)); rig.location = (0.02, 0.0, 0.0) if not MINI else (0.04, -0.03, 0.0)
+OFF = Vector((0.06, -0.07, 0.0)) if not MINI else Vector((0.0, 0.0, 0.0))   # «Компакт» шире — в сторону от бумаг, камеры — вместе с ним
+rig.rotation_euler = (0, 0, math.radians(14 if not MINI else 18)); rig.location = Vector((0.02, 0.0, 0.0)) + OFF if not MINI else (0.04, -0.03, 0.0)
 
 
 # ---------------- реквизит Poly Haven ----------------
@@ -204,7 +205,9 @@ place(cup, CUP, 0, name="стакан")
 pens = {n: [o for o in st if n in o.name] for n in ("pen_blue", "pen_red", "pen_fancy", "pencil_new_a", "pencil_used", "eraser")}
 place(pens["pen_blue"], (-0.22, 0.31), 70, z=0.010, name="синяя ручка")      # лежит на стопке A4 (высота 10 мм)
 place(pens["pen_red"], (0.11, 0.43), 40, z=0.010, name="красная ручка")      # на жёлтом блокноте (10 мм)
-place(pens["pen_fancy"], (0.29, 0.07), -35, name="ручка")                      # на столе
+RIGHT = ({"ручка": (0.29, 0.07), "зажигалка": (0.31, -0.07), "наушники": (0.26, -0.22)} if MINI else   # «Компакт» шире —
+         {"ручка": (0.36, 0.12), "зажигалка": (0.37, 0.01), "наушники": (0.34, -0.31)})                      # предметы справа дальше
+place(pens["pen_fancy"], RIGHT["ручка"], -35, name="ручка")                     # на столе
 for i, (n, tilt, yaw) in enumerate((("pencil_new_a", 9, 40), ("pencil_used", 12, 200))):   # карандаши в стакане:
     r = place(pens[n], (0, 0), 0, name=f"карандаш {i + 1}")        # низ — на дне стакана (6 мм), наклон к стенке
     L = bbox(pens[n])[1].x - bbox(pens[n])[0].x
@@ -213,7 +216,7 @@ for i, (n, tilt, yaw) in enumerate((("pencil_new_a", 9, 40), ("pencil_used", 12,
     lower = Vector((CUP[0] + 0.012 * math.cos(y_ + math.pi), CUP[1] + 0.012 * math.sin(y_ + math.pi), 0.006))
     r.rotation_euler = (0, math.radians(-(90 - tilt)), y_); r.location = lower + u * (L / 2)
 place(pens["eraser"], (0.03, 0.21), 15, name="ластик")
-place(import_gltf("vintage_lighter"), (0.31, -0.07), 120, name="зажигалка")
+place(import_gltf("vintage_lighter"), RIGHT["зажигалка"], 120, name="зажигалка")
 place(import_gltf("round_spectacles"), (-0.12, -0.38), 160, name="очки")
 place(import_gltf("standing_picture_frame_01"), (-0.44, -0.36), 35, name="рамка")
 # potted_plant_02 — напольное растение (горшок Ø47 см, высота 63 см): на стол в реальном масштабе не помещается — убрано
@@ -258,7 +261,7 @@ for sy in (-1, 1):
     d_ = bpy.context.active_object; d_.data.materials.append(white); d_.parent = buds
 bpy.ops.mesh.primitive_uv_sphere_add(radius=0.0012, location=(0.0255, 0.0, 0.0175))
 rd = bpy.context.active_object; rd.data.materials.append(red); rd.parent = buds
-buds.location = (0.26, -0.22, 0); buds.rotation_euler = (0, 0, math.radians(18))
+buds.location = (*RIGHT["наушники"], 0); buds.rotation_euler = (0, 0, math.radians(18))
 
 cer = mat("Керамика", srgb("#EDE4D3"), 0.25, 0, 0.3)
 coffee = mat("Кофе", srgb("#2B160B"), 0.08)
@@ -313,6 +316,7 @@ for k, c in CAMS.items():
     cd = bpy.data.cameras.new(f"Камера {k}"); cd.lens = c["lens"]
     cd.dof.use_dof = True; cd.dof.aperture_fstop = c["f"]
     co = bpy.data.objects.new(f"Камера {k}", cd); scene.collection.objects.link(co)
+    c = dict(c, loc=tuple(Vector(c["loc"]) + OFF), tgt=tuple(Vector(c["tgt"]) + OFF))
     co.location = c["loc"]; co.rotation_euler = (Vector(c["tgt"]) - Vector(c["loc"])).to_track_quat("-Z", "Y").to_euler()
     cd.dof.focus_distance = (Vector(c["tgt"]) - Vector(c["loc"])).length
     cams[k] = co

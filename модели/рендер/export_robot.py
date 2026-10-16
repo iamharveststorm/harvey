@@ -233,6 +233,10 @@ def robot(variant):
         tray = B.tray()                                   # поднос — под крышкой, не нужен
         groups["orange"] = [m for m in groups["orange"] if m is not tray]
     out = {k: U(v).translate([0, 0, ZJ + 2.0]) for k, v in groups.items() if v}
+    dz = -min(m.bounding_box()[2] for m in out.values())          # на стол по самой нижней точке: стопы касаются стола
+    out = {k: m.translate([0, 0, dz]) for k, m in out.items()}
+    screens = {s_: dict(v, center=[v["center"][0], v["center"][1], v["center"][2] + dz]) for s_, v in screens.items()}
+    print(f"{variant}: поднято на {dz:+.1f} мм до касания стола")
     return out, screens
 
 
