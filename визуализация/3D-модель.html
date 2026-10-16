@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Харви «Компакт» — 3D-модель</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E4E9EC; --ink:#1F2A31; --muted:#56636C; --panel:rgba(250,251,252,.86); --line:#C9D2D7;
+  --accent:#2F7F86; --accent-ink:#FFFFFF; --table:#CDB89A;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151B1F; --ink:#E8EDF0; --muted:#9AA7AF; --panel:rgba(28,36,41,.86); --line:#33414A;
+    --accent:#5FB8BF; --accent-ink:#0E1A1C; --table:#6B5B47;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151B1F; --ink:#E8EDF0; --muted:#9AA7AF; --panel:rgba(28,36,41,.86); --line:#33414A;
+  --accent:#5FB8BF; --accent-ink:#0E1A1C; --table:#6B5B47;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Golos Text","Segoe UI",system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.head{position:fixed;top:calc(env(safe-area-inset-top,0px) + 20px);left:20px;max-width:min(420px,calc(100% - 40px));pointer-events:none}
+.head h1{margin:0;font-family:"Unbounded","Golos Text",system-ui,sans-serif;font-weight:600;font-size:clamp(28px,5vw,44px);line-height:1;letter-spacing:-.5px}
+.head p{margin:10px 0 0;font-size:15px;line-height:1.45;color:var(--muted)}
+.bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;max-width:calc(100% - 24px);padding:10px;border-radius:18px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button,.tog{font:inherit;font-size:14px;font-weight:500;color:var(--ink);background:transparent;border:0;padding:9px 14px;cursor:pointer;min-height:40px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"],.tog[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tog{border:1px solid var(--line);border-radius:12px}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dims{position:fixed;right:20px;top:calc(env(safe-area-inset-top,0px) + 20px);padding:14px 16px;border-radius:14px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:14px;min-width:210px}
+.dims dl{margin:0;display:grid;grid-template-columns:auto auto;gap:6px 18px}
+.dims dt{color:var(--muted)}
+.dims dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.legend{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:none;gap:6px;flex-direction:column;font-size:13px;color:var(--muted)}
+.legend.on{display:flex}
+.legend span{display:flex;align-items:center;gap:8px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block;flex-shrink:0}
+@media (max-width:640px){
+  .dims{top:auto;right:12px;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 240px);min-width:0}
+  .head p{display:none}
+}
+</style>
+</head>
+<body>
+<div id="stage" aria-label="Трёхмерная модель робота Харви, её можно вращать"></div>
+<header class="head">
+  <h1>Харви</h1>
+  <p>Компоновка v2 — настоящие детали из CAD: клешни впереди передних ног, глаза-стебельки на углах, хвост на колонне, открытая рама с начинкой. Вращайте модель мышью или пальцем, колесом или щипком меняйте масштаб.</p>
+</header>
+<aside class="dims" aria-live="polite">
+  <dl>
+    <dt>Габарит</dt><dd id="dSize">285 × 297 мм</dd>
+    <dt>Высота</dt><dd id="dH">215 мм</dd>
+    <dt>Просвет</dt><dd id="dC">39 мм</dd>
+    <dt>Масса</dt><dd>≈ 2,6 кг</dd>
+    <dt>Вылет клешни</dt><dd>157 мм</dd>
+  </dl>
+  <div class="legend" id="legend">
+    <span><i style="background:#3A6EA5"></i>Аккумуляторы 3 × 21700</span>
+    <span><i style="background:#1F7A45"></i>Raspberry Pi 5 и Pico 2</span>
+    <span><i style="background:#3B4A6B"></i>Ускоритель AI HAT+</span>
+    <span><i style="background:#23272B"></i>Сервоприводы STS3215</span>
+    <span><i style="background:#545C63"></i>Микрофоны reSpeaker Flex</span>
+    <span><i style="background:#4A525A"></i>Опорная плита 4 мм</span>
+  </div>
+</aside>
+<nav class="bar" aria-label="Управление моделью">
+  <div class="seg" role="group" aria-label="Стойка">
+    <button id="bWork" aria-pressed="true">Рабочая стойка</button>
+    <button id="bRest" aria-pressed="false">В покое</button>
+  </div>
+  <div class="seg" role="group" aria-label="Клешни">
+    <button id="aTuck" aria-pressed="true">Клешни сложены</button>
+    <button id="aTable" aria-pressed="false">К столу</button>
+    <button id="aBack" aria-pressed="false">На спину</button>
+  </div>
+  <div class="seg" role="group" aria-label="Хвост">
+    <button id="tRest" aria-pressed="true">Хвост сложен</button>
+    <button id="tTable" aria-pressed="false">Хвост к столу</button>
+    <button id="tBack" aria-pressed="false">Хвост на спину</button>
+  </div>
+  <button class="tog" id="bXray" aria-pressed="false">Мягкий кожух</button>
+  <button class="tog" id="bSpin" aria-pressed="true">Автоповорот</button>
+</nav>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/harvey_meshes.js"></script>
+<script>
+(function(){
+const stage=document.getElementById('stage');
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dark=()=>window.matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme!=='light' || document.documentElement.dataset.theme==='dark';
+
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(32,1,1,6000);
+camera.position.set(430,320,560);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.set(0,85,20);
+controls.enableDamping=true;
+controls.minDistance=240; controls.maxDistance=1500;
+controls.maxPolarAngle=Math.PI*0.49;
+controls.autoRotate=!reduce; controls.autoRotateSpeed=0.8;
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x8a7b66,0.65));
+const sun=new THREE.DirectionalLight(0xffffff,0.95);
+sun.position.set(260,520,320); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-320,right:320,top:320,bottom:-320,near:10,far:1500});
+sun.shadow.bias=-0.0006;
+scene.add(sun);
+const fill=new THREE.DirectionalLight(0xdfe9ff,0.35); fill.position.set(-400,200,-300); scene.add(fill);
+
+// ---------- materials ----------
+const M=(c,r=0.55,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const mat={
+  shell:new THREE.MeshStandardMaterial({color:0xE0673C,roughness:0.5,metalness:0,transparent:true,opacity:1}),
+  printed:M(0xD95F35,0.6),
+  servo:M(0x23272B,0.45,0.1),
+  horn:M(0xC9CED2,0.3,0.8),
+  bracket:M(0x4A525A,0.4,0.6),
+  tpu:M(0x2B2E31,0.9),
+  bezel:M(0x1E2226,0.4,0.2),
+  screen:new THREE.MeshStandardMaterial({color:0x07161A,roughness:0.2,metalness:0.1,emissive:0x041013}),
+  pupil:new THREE.MeshStandardMaterial({color:0x5FD4D9,emissive:0x5FD4D9,emissiveIntensity:0.85,roughness:0.3}),
+  white:new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:0.6}),
+  battery:M(0x3A6EA5,0.35,0.2),
+  pcb:M(0x1F7A45,0.6),
+  hat:M(0x3B4A6B,0.6),
+  chip:M(0x111417,0.4,0.3),
+  mic:M(0x545C63,0.6),
+  table:M(0xCDB89A,0.85)
+};
+const shadowed=o=>{o.traverse(c=>{if(c.isMesh){c.castShadow=true;c.receiveShadow=true}});return o};
+const box=(w,h,d,m)=>new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+const HMAT={printed:mat.printed,grey:M(0x3A3F45,.45,.1),servo:mat.servo,metal:M(0xC9CCD1,.3,.9),tpu:mat.tpu,
+  glass:new THREE.MeshStandardMaterial({color:0xDDE6EE,roughness:.05,transparent:true,opacity:.18}),pcb:mat.pcb,battery:mat.battery,
+  red:M(0xD21F1F,.4),cup:new THREE.MeshStandardMaterial({color:0xEEF2F6,roughness:.3,transparent:true,opacity:.85}),shell:M(0x2B2F35,.55,.05)};
+function hmesh(name,mirror){ // настоящие детали звена из CAD (lib/harvey_meshes.js, модели/рендер/export_web.py)
+  const g=new THREE.Group();
+  ((window.HARVEY_MESHES||{})[name]||[]).forEach(d=>{
+    const bin=atob(d.v), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    const q=new Int16Array(u8.buffer), f=new Float32Array(q.length); for(let i=0;i<q.length;i++)f[i]=q[i]*d.s;
+    const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(f,3)); geo.computeVertexNormals();
+    const m=new THREE.Mesh(geo,HMAT[d.m]||mat.printed); m.castShadow=true; m.receiveShadow=true; g.add(m);});
+  if(mirror)g.scale.x=-1;
+  return g;
+}
+const HG=window.HARVEY_GEO||{};
+
+// cylinder between two points
+function limb(a,b,r1,r2,m){
+  const dir=new THREE.Vector3().subVectors(b,a); const len=dir.length();
+  const g=new THREE.CylinderGeometry(r2,r1,len,20); g.translate(0,len/2,0);
+  const mesh=new THREE.Mesh(g,m); mesh.position.copy(a);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.normalize());
+  return mesh;
+}
+function hornDisc(r=9){const g=new THREE.CylinderGeometry(r,r,3,24);g.rotateX(Math.PI/2);return new THREE.Mesh(g,mat.horn)}
+
+// ---------- table ----------
+const table=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),mat.table);
+table.rotation.x=-Math.PI/2; table.receiveShadow=true; scene.add(table);
+
+// ---------- robot ----------
+const robot=new THREE.Group(); scene.add(robot);
+const body=new THREE.Group(); robot.add(body);   // body modelled at working-stance heights
+
+// корпус: открытая рама v2 (рама, поднос, электроника, неподвижные приводы) — из CAD
+body.add(hmesh('body'));
+const softShell=hmesh('shell_soft'); softShell.visible=false; body.add(softShell);   // вариант «мягкий»: графитовый панцирь
+const internals=new THREE.Group(); body.add(internals);
+
+// ---------- legs ----------
+// звенья: основание 40, бедро 51, голень до центра стопы 62,5 (+ стопа R 7,5) — как в физической модели (leg_check.py)
+const L={coxa:40,femur:51,tibia:62.5,foot:7.5};
+const ZJ0=52.6;  // высота осей бедра в рабочей стойке (модель корпуса построена под неё)
+const POSES={work:{fem:20,tib:0},rest:{fem:46.2,tib:11.2}};   // покой «на корточках»: колено −125°
+function solve(p){
+  const f=p.fem*Math.PI/180,t=p.tib*Math.PI/180;
+  const kx=L.coxa+L.femur*Math.cos(f), ky=L.femur*Math.sin(f);
+  const fx=kx+L.tibia*Math.sin(t), fy=ky-L.tibia*Math.cos(t);
+  return {zj:-fy+L.foot,fx};
+}
+const STS=[45.2,24.7,35];   // реальные габариты STS3215, мм
+const legs=[];
+const mounts=[[58,55,40],[66,0,0],[58,-55,-40]];
+[1,-1].forEach(side=>mounts.forEach(([bx,bz,ang])=>{
+  const dx=side*Math.cos(ang*Math.PI/180), dz=Math.sin(ang*Math.PI/180);
+  const root=new THREE.Group(); root.position.set(side*bx,ZJ0,bz); root.rotation.y=Math.atan2(-dz,dx);
+  root.add(hmesh('leg_coxa'));                                  // привод основания — в раме (в «body»)
+  const fem=new THREE.Group(); fem.position.set(L.coxa,0,0); root.add(fem); fem.add(hmesh('leg_femur'));
+  const knee=new THREE.Group(); knee.position.set(L.femur,0,0); fem.add(knee); knee.add(hmesh('leg_tibia'));
+  shadowed(root); body.add(root);
+  legs.push({fem,knee});
+}));
+
+// ---------- claws: поворот плеча, подъём плеча, локоть, вращение запястья, захват ----------
+const A={up:54,fore:60,hand:43,tipX:41.6,tipZ:-17.5};   // как в модели клешни: пальцы отогнуты вниз
+const L2A=Math.hypot(A.fore+A.tipX,A.tipZ), TIPD=Math.atan2(A.tipZ,A.fore+A.tipX);
+const SH={y:ZJ0+65,z:105,x:30};          // компоновка v2: плечи впереди передних ног
+function armIK(dx,dz){                     // dx вперёд, dz вверх от плеча, мм; кончик — концы отогнутых пальцев
+  const d=Math.min(Math.hypot(dx,dz),A.up+L2A-0.1), L2=L2A;
+  const a=Math.acos(Math.max(-1,Math.min(1,(A.up*A.up+d*d-L2*L2)/(2*A.up*d))));
+  const g=Math.acos(Math.max(-1,Math.min(1,(A.up*A.up+L2*L2-d*d)/(2*A.up*L2))));
+  const base=Math.atan2(dz,dx);
+  return (dz<0||dx>0)?{p:base+a,e:-(Math.PI-g)-TIPD}:{p:base-a,e:Math.PI-g-TIPD};
+}
+const ARM_POSES={tuck:[38,-89],table:[80,-103.6],back:[-113,23]};   // как в симуляции
+const arms=[];
+function claw(side){
+  const s=side, root=new THREE.Group(); root.position.set(s*SH.x,SH.y,SH.z);
+  const mir=s<0; root.add(hmesh('claw_yaw',mir));
+  const pitch=new THREE.Group(); root.add(pitch); pitch.add(hmesh('claw_up',mir));
+  const elbow=new THREE.Group(); elbow.position.set(0,0,A.up); pitch.add(elbow); elbow.add(hmesh('claw_fore',mir));
+  const wrist=new THREE.Group(); wrist.position.set(0,0,A.fore); elbow.add(wrist); wrist.add(hmesh('claw_hand',mir));
+  const jaw=new THREE.Group(); jaw.position.set(0,0,HG.jaw_pivot||15); jaw.rotation.x=-12*Math.PI/180; wrist.add(jaw); jaw.add(hmesh('claw_jaw',mir));
+  arms.push({pitch,elbow});
+  return shadowed(root);
+}
+body.add(claw(1)); body.add(claw(-1));
+let armCur=armIK(...ARM_POSES.tuck), armFrom={...armCur}, armTo={...armCur}, aT0=0;
+function applyArm(a){arms.forEach(r=>{r.pitch.rotation.x=-a.p; r.elbow.rotation.x=-a.e;});
+  (window.__eyeG||[]).forEach((g,i)=>g.rotation.z=(i?-1:1)*(a.p*180/Math.PI>=60?-20:0)*Math.PI/180);}   // клешня поднята — глаз отклоняется наружу
+applyArm(armCur);
+function goArm(name){
+  armFrom={...armCur}; armTo=armIK(...ARM_POSES[name]); aT0=performance.now(); if(reduce) aT0-=1400;
+  ['aTuck','aTable','aBack'].forEach((id,i)=>document.getElementById(id).setAttribute('aria-pressed',String(['tuck','table','back'][i]===name)));
+}
+
+// ---------- хвост: поворот, плечо, локоть, наклон запястья, присоска ----------
+const TL={up:70,fore:70,cup:26,mount:{z:-80,y:ZJ0+72}};
+function tailIK(f,u){ // рабочая точка присоски: вперёд f, высота u над столом, мм
+  const dx=f-TL.mount.z, dz=(u+TL.cup)-TL.mount.y;
+  const lx=-dx; const r=lx; const d=Math.min(Math.max(Math.hypot(r,dz),0.1),TL.up+TL.fore-0.1);
+  const a=Math.acos(Math.max(-1,Math.min(1,(TL.up**2+d*d-TL.fore**2)/(2*TL.up*d))));
+  const g=Math.acos(Math.max(-1,Math.min(1,(TL.up**2+TL.fore**2-d*d)/(2*TL.up*TL.fore))));
+  const up=dz<-20;                         // к столу — «локоть вверх» (подъём не ниже −40°)
+  const p=up?Math.atan2(dz,r)+a:Math.atan2(dz,r)-a, e=up?-(Math.PI-g):Math.PI-g;
+  let w=-Math.PI/2-(p+e); w=((w+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+  return {p,e,w};
+}
+const TAIL_POSES={rest:[-40,147.6],table:[-180,7],back:[-15,142.6]};
+const tail=(function(){
+  const root=new THREE.Group(); root.position.set(0,TL.mount.y,TL.mount.z); root.rotation.y=Math.PI; body.add(root);
+  root.add(hmesh('tail_yaw'));
+  const pitch=new THREE.Group(); root.add(pitch); pitch.add(hmesh('tail_up'));
+  const elbow=new THREE.Group(); elbow.position.z=TL.up; pitch.add(elbow); elbow.add(hmesh('tail_fore'));
+  const wrist=new THREE.Group(); wrist.position.z=TL.fore; elbow.add(wrist); wrist.add(hmesh('tail_cup'));
+  shadowed(root);
+  return {pitch,elbow,wrist};
+})();
+let tailCur=tailIK(...TAIL_POSES.rest), tailFrom={...tailCur}, tailTo={...tailCur}, tT0=0;
+function applyTail(t){tail.pitch.rotation.x=-t.p; tail.elbow.rotation.x=-t.e; tail.wrist.rotation.x=-t.w;}
+applyTail(tailCur);
+function goTail(name){
+  tailFrom={...tailCur}; tailTo=tailIK(...TAIL_POSES[name]); tT0=performance.now(); if(reduce) tT0-=1600;
+  ['tRest','tTable','tBack'].forEach((id,i)=>document.getElementById(id).setAttribute('aria-pressed',String(['rest','table','back'][i]===name)));
+}
+
+// ---------- глаза-стебельки на передних углах (ось крена — вдоль корпуса) ----------
+const eyes=[], eyeGroups=[]; window.__eyeG=eyeGroups;
+[1,-1].forEach(s=>{
+  const P=HG.eye_pivot||[70,80,128.6], sc=HG.eye_screen||[19,0,60];
+  const e=new THREE.Group(); e.position.set(s*P[1],P[2],P[0]); body.add(e); e.add(hmesh('eye',s<0)); eyeGroups.push(e);
+  const scr=new THREE.Group(); scr.position.set(0,sc[2],sc[0]+0.3); e.add(scr);
+  scr.add(new THREE.Mesh(new THREE.CircleGeometry(HG.eye_r||16,40),mat.screen));
+  const pu=new THREE.Mesh(new THREE.CircleGeometry(8,32),mat.pupil); pu.position.set(-s*1.5,1.5,0.1); scr.add(pu);
+  const hl=new THREE.Mesh(new THREE.CircleGeometry(2.6,16),mat.white); hl.position.set(s*1.5,4.8,0.2); scr.add(hl);
+  eyes.push(scr);
+});
+
+// ---------- pose ----------
+let cur={...POSES.work}, from={...cur}, to={...cur}, t0=0, dur=900;
+function apply(p){
+  const {zj}=solve(p);
+  body.position.y=zj-ZJ0;
+  legs.forEach(l=>{
+    l.fem.rotation.z=p.fem*Math.PI/180;
+    l.knee.rotation.z=(p.tib-90-p.fem)*Math.PI/180;
+  });
+}
+function readout(p){
+  const {zj,fx}=solve(p);
+  const width=Math.round(2*(66+fx));
+  const length=Math.round(124+143+18);   // от хвоста (−124) до кончиков клешней «поджато» (+143) с запасом на пальцы
+  document.getElementById('dSize').textContent=length+' × '+width+' мм';
+  document.getElementById('dH').textContent=Math.round(ZJ0+76+60+26+(zj-ZJ0))+' мм';   // верх глаз
+  document.getElementById('dC').textContent=Math.round(ZJ0-14+(zj-ZJ0))+' мм';    // днище — на 14 мм ниже осей бедра
+}
+function go(name){
+  from={...cur}; to={...POSES[name]}; t0=performance.now(); if(reduce) t0-=dur;
+  document.getElementById('bWork').setAttribute('aria-pressed',String(name==='work'));
+  document.getElementById('bRest').setAttribute('aria-pressed',String(name==='rest'));
+  readout(to);
+}
+apply(cur); readout(cur);
+
+document.getElementById('bWork').onclick=()=>go('work');
+document.getElementById('aTuck').onclick=()=>goArm('tuck');
+document.getElementById('tRest').onclick=()=>goTail('rest');
+document.getElementById('tTable').onclick=()=>goTail('table');
+document.getElementById('tBack').onclick=()=>goTail('back');
+document.getElementById('aTable').onclick=()=>goArm('table');
+document.getElementById('aBack').onclick=()=>goArm('back');
+document.getElementById('bRest').onclick=()=>go('rest');
+document.getElementById('bXray').onclick=e=>{
+  const on=e.currentTarget.getAttribute('aria-pressed')!=='true';
+  e.currentTarget.setAttribute('aria-pressed',String(on));
+  softShell.visible=on;                     // вариант «мягкий»: графитовый панцирь поверх открытой рамы
+};
+document.getElementById('bSpin').setAttribute('aria-pressed',String(controls.autoRotate));
+document.getElementById('bSpin').onclick=e=>{
+  controls.autoRotate=!controls.autoRotate;
+  e.currentTarget.setAttribute('aria-pressed',String(controls.autoRotate));
+};
+controls.addEventListener('start',()=>{ if(controls.autoRotate){controls.autoRotate=false;document.getElementById('bSpin').setAttribute('aria-pressed','false')} });
+
+function theme(){
+  const d=dark();
+  mat.table.color.set(d?0x5E5040:0xCDB89A);
+}
+theme();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',theme);
+
+function resize(){
+  const w=stage.clientWidth,h=stage.clientHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h;
+  camera.position.setLength(w<640?760:620);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize); resize();
+
+const ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+function tick(now){
+  const k=Math.min(1,(now-t0)/dur);
+  if(k<1||cur.fem!==to.fem){
+    const e=ease(k); cur={fem:from.fem+(to.fem-from.fem)*e,tib:from.tib+(to.tib-from.tib)*e};
+    if(k>=1) cur={...to};
+    apply(cur);
+  }
+  const ka=Math.min(1,(now-aT0)/1400);
+  if(ka<1||armCur.p!==armTo.p){const e=ease(ka); armCur={p:armFrom.p+(armTo.p-armFrom.p)*e,e:armFrom.e+(armTo.e-armFrom.e)*e}; if(ka>=1) armCur={...armTo}; applyArm(armCur);}
+  const kt=Math.min(1,(now-tT0)/1600);
+  if(kt<1||tailCur.p!==tailTo.p){const e=ease(kt); tailCur={p:tailFrom.p+(tailTo.p-tailFrom.p)*e,e:tailFrom.e+(tailTo.e-tailFrom.e)*e,w:tailFrom.w+(tailTo.w-tailFrom.w)*e}; if(kt>=1) tailCur={...tailTo}; applyTail(tailCur);}
+  const blink=(!reduce && (now%4200)<120)?0.1:1;
+  eyes.forEach(e=>e.scale.y=blink);
+  controls.update(); renderer.render(scene,camera); requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

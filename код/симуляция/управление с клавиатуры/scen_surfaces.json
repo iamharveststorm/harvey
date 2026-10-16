@@ -1,0 +1,42 @@
+{
+ "дерево μ=0.8": {
+  "fell": false,
+  "v": 12.9,
+  "tilt": 0.2,
+  "margin": 20,
+  "peak": 1.64,
+  "over": 4.4,
+  "stopped_at": null,
+  "x_end": 966
+ },
+ "чистое стекло μ=0.6": {
+  "fell": false,
+  "v": 13.0,
+  "tilt": 0.2,
+  "margin": 20,
+  "peak": 1.64,
+  "over": 4.5,
+  "stopped_at": null,
+  "x_end": 971
+ },
+ "глянцевая бумага, пыль μ=0.3": {
+  "fell": false,
+  "v": 13.0,
+  "tilt": 0.2,
+  "margin": 20,
+  "peak": 1.65,
+  "over": 4.9,
+  "stopped_at": null,
+  "x_end": 974
+ },
+ "очень скользко μ=0.15": {
+  "fell": false,
+  "v": 12.9,
+  "tilt": 0.2,
+  "margin": 20,
+  "peak": 1.65,
+  "over": 5.2,
+  "stopped_at": null,
+  "x_end": 967
+ }
+}
