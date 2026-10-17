@@ -1,0 +1,14 @@
+{
+ "excludes": [
+  "визуализация/lib/",
+  "визуализация/*.html",
+  "**/assets/world/",
+  "модели/рендер/tex/",
+  "**/*.json",
+  "**/MUJOCO_LOG.TXT",
+  "**/sim_results.txt",
+  "**/requirements.txt",
+  "модели/чертежи/_проверка.txt"
+ ],
+ "gitignore": true
+}
