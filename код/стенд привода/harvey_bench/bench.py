@@ -1,13 +1,13 @@
-"""Харви, этап 1: стенд привода STS3215-C018. Замеры 1–7 из протокола стенда.
+"""Харви, этап 1: стенд привода. «Компакт» — STS3215-C018 (12 В), «Компакт мини» — STS3032-C036 (6 В) и нога целиком.
 
 Запуск:
-    python -m harvey_bench.bench --port COM5        # Windows (номер порта — в диспетчере устройств)
-    python -m harvey_bench.bench --port /dev/ttyUSB0
-    python -m harvey_bench.bench --sim              # без железа: имитация привода
-    python -m harvey_bench.bench --sim --auto       # имитация с ответами по умолчанию (самопроверка)
+    python -m harvey_bench.bench --port COM5                    # «Компакт», STS3215 (номер порта — в диспетчере устройств)
+    python -m harvey_bench.bench --servo sts3032 --port COM5    # «Компакт мини»: приводы и нога на стенде
+    python -m harvey_bench.bench --sim                          # без железа: имитация (можно с --servo sts3032)
+    python -m harvey_bench.bench --sim --auto                   # имитация с ответами по умолчанию (самопроверка)
 
-Безопасность: перед каждым замером с включённым моментом проверяется напряжение (10–13 В)
-и температура (< 60 °C); упор — не дольше 2 с; при Ctrl+C или ошибке момент отключается.
+Безопасность: перед каждым замером с включённым моментом проверяется напряжение (STS3215 — 10–13 В,
+STS3032 — 5,4–6,6 В) и температура (< 60 °C); упор — не дольше 2 с; при Ctrl+C или ошибке момент отключается.
 """
 from __future__ import annotations
 
@@ -31,14 +31,20 @@ STEP_DEG = sts.DEG_PER_STEP
 
 
 class Bench:
-    def __init__(self, bus, auto: bool = False, speedup: float = 1.0, clock=time.monotonic):
-        self.bus, self.auto, self.speedup, self.clock = bus, auto, speedup, clock
+    def __init__(self, bus, auto: bool = False, speedup: float = 1.0, clock=time.monotonic,
+                 profile: sts.Profile = sts.PROFILES["sts3215"]):
+        self.bus, self.auto, self.speedup, self.clock, self.p = bus, auto, speedup, clock, profile
         self.results: list[dict] = []
         self.log_rows: list[list] = []
+        self.log_header = ["Время, с", "Температура, °C", "Ток, А", "Напряжение, В", "Позиция"]
         self.lsb = sts.CURRENT_LSB_A
+        self.current_ok = profile.current_sensor          # есть ли ток в регистрах привода
         if CALIB_FILE.exists():
             try:
-                self.lsb = float(json.loads(CALIB_FILE.read_text(encoding="utf-8"))["current_lsb_a"])
+                d = json.loads(CALIB_FILE.read_text(encoding="utf-8"))
+                legacy = d.get("current_lsb_a", self.lsb) if profile.key == "sts3215" else self.lsb
+                self.lsb = float(d.get(profile.key, legacy))
+                self.current_ok = self.current_ok or bool(d.get(profile.key + "_sensor"))
             except Exception:
                 pass
 
@@ -75,7 +81,37 @@ class Bench:
     def servo(self, sid: int) -> sts.Servo:
         return sts.Servo(self.bus, sid, self.lsb)
 
-    def precheck(self, s: sts.Servo, vmin: float = 10.0, vmax: float = 13.0) -> bool:
+    def amps(self, st: sts.State) -> float:
+        """Ток привода: из регистра, а если датчика нет (STS3032) — оценка по нагрузке: покой + нагрузка × ток упора."""
+        if self.current_ok:
+            return st.current_a
+        return self.p.idle_a + abs(st.load_pct) / 100.0 * self.p.stall_a
+
+    def calibrate_current(self, raw_a: float | None, real_a: float | None) -> None:
+        """Сверить ток из регистра с блоком питания и запомнить масштаб (или что датчика нет)."""
+        if not real_a or real_a <= 0.3:
+            return
+        if raw_a and raw_a > 0.05:
+            self.lsb *= real_a / raw_a
+            self.current_ok = True
+            print(f"  Датчик тока отвечает: масштаб уточнён — {self.lsb * 1000:.2f} мА на единицу.")
+        else:
+            print("  В регистре тока нули — датчика тока нет (как в даташите). Ток оцениваю по нагрузке привода.")
+        d = {}
+        if CALIB_FILE.exists():
+            try:
+                d = json.loads(CALIB_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                d = {}
+        d[self.p.key] = self.lsb
+        d[self.p.key + "_sensor"] = self.current_ok
+        if self.p.key == "sts3215":
+            d["current_lsb_a"] = self.lsb
+        CALIB_FILE.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+    def precheck(self, s: sts.Servo, vmin: float | None = None, vmax: float | None = None) -> bool:
+        vmin = self.p.vmin if vmin is None else vmin
+        vmax = self.p.vmax if vmax is None else vmax
         st = s.state()
         print(f"  Напряжение {st.volt:.1f} В, температура {st.temp} °C, позиция {st.pos}")
         if not vmin <= st.volt <= vmax:
@@ -95,12 +131,22 @@ class Bench:
                 model = self.servo(i).model()
             except sts.BusError:
                 model = -1
-            name = "STS3215" if model == sts.MODEL_STS3215 else f"модель {model}"
+            short = self.p.title.split()[0]
+            if self.p.model is None:
+                name = f"{short}? модель {model} — номер запишется в отчёт"
+            elif model == self.p.model:
+                name = short
+            else:
+                name = f"модель {model} — НЕ {short}! Проверь привод и режим стенда"
             print(f"  привод №{i}: {name}")
         if not found:
-            print("  Никого. Проверь питание 12 В, кабель и что красный провод от адаптера отключён (см. README).")
+            if self.p.key == "sts3215":
+                print("  Никого. Проверь питание 12 В, кабель и что красный провод от адаптера отключён (см. README).")
+            else:
+                print("  Никого. Проверь: 6,0 В на клеммах адаптера, переходник 1,25 → 5264 в разъёме TTL (3 контакта), USB.")
+        models = sorted({self.servo(i).model() for i in found}) if found else []
         self.add("1", "Связь: найдено приводов", str(len(found)), "все подключённые", bool(found),
-                 "номера: " + ", ".join(map(str, found)))
+                 "номера: " + ", ".join(map(str, found)) + ("; модель в регистре: " + ", ".join(map(str, models)) if models else ""))
         return found
 
     def assign_id(self) -> None:
@@ -119,7 +165,8 @@ class Bench:
     # ---------- замер 2: ток покоя и упора ----------
     def current_test(self, sid: int) -> None:
         s = self.servo(sid)
-        print("\nЗамер 2. Ток покоя и в упоре. Блок питания: 12,0 В, предел тока 3 А.")
+        v = str(self.p.volt).replace(".", ",")
+        print(f"\nЗамер 2. Ток покоя{' и в упоре' if self.p.key == 'sts3215' else ''}. Блок питания: {v} В, предел тока 3 А.")
         if not self.precheck(s):
             return
         start = s.pos()
@@ -127,8 +174,18 @@ class Bench:
         s.move(start)
         s.torque(True)
         self.sleep(1.0)
-        idle = statistics.median(s.state().current_a for _ in range(20))
-        self.add("2а", "Ток покоя (удержание без нагрузки)", f"{idle:.3f} А", "≤ 0,1 А", idle <= 0.1)
+        idle = statistics.median(self.amps(s.state()) for _ in range(20))
+        norm = f"≤ {str(self.p.idle_max_a).replace('.', ',')} А"
+        if not self.current_ok:
+            psu = self.ask_float("  Датчика тока у привода нет. Сколько ампер показывает блок питания (на шине один привод)?",
+                                 round(idle, 3))
+            idle = psu if psu is not None else idle
+        self.add("2а", "Ток покоя (удержание без нагрузки)", f"{idle:.3f} А", norm, idle <= self.p.idle_max_a,
+                 f"паспорт {self.p.idle_a * 1000:.0f} мА")
+        if self.p.key != "sts3215":
+            s.torque(False)
+            print("  Ток в упоре у мини меряем на собранной ноге: пункт «Нога: момент бедра».")
+            return
         self.wait_enter("  Упор: поставь рычаг так, чтобы при повороте ПО ЧАСОВОЙ он упёрся в неподвижную преграду.")
         if isinstance(getattr(self.bus, "servos", None), dict):
             self.bus.servos[sid].block_at = start + 120           # имитация преграды
@@ -164,6 +221,9 @@ class Bench:
 
     # ---------- замер 3: момент ----------
     def torque_test(self, sid: int) -> None:
+        if self.p.key != "sts3215":
+            print("\nМомент STS3032 меряем на собранной ноге: пункт «Нога: момент бедра».")
+            return
         s = self.servo(sid)
         print("\nЗамер 3. Момент через рычаг 100 мм и весы.")
         for v_nom, norm in ((12.0, 2.5), (10.2, 2.0)):
@@ -192,8 +252,8 @@ class Bench:
     # ---------- замер 4: скорость ----------
     def speed_test(self, sid: int) -> None:
         s = self.servo(sid)
-        print("\nЗамер 4. Скорость: поворот на 90° без нагрузки (рычаг свободен, ничего не мешает).")
-        self.wait_enter("  Освободи рычаг.")
+        print("\nЗамер 4. Скорость: поворот на 90° без нагрузки (ничего не мешает).")
+        self.wait_enter("  Привод лежит свободно, на качалке ничего нет (или рычаг свободен).")
         if not self.precheck(s):
             return
         start = s.pos()
@@ -213,13 +273,15 @@ class Bench:
             self.sleep(0.4)
         s.torque(False)
         t90 = max(times)
-        self.add("4", "Поворот на 90°", f"{t90:.3f} с", "≤ 0,4 с", t90 <= 0.4,
-                 f"туда {times[0]:.3f} с, обратно {times[1]:.3f} с; паспорт 0,333 с")
+        lim = round(self.p.t90_spec * 1.2, 2)
+        self.add("4", "Поворот на 90°", f"{t90:.3f} с", f"≤ {str(lim).replace('.', ',')} с", t90 <= lim,
+                 f"туда {times[0]:.3f} с, обратно {times[1]:.3f} с; паспорт {str(self.p.t90_spec).replace('.', ',')} с "
+                 "(с опросом по USB время чуть больше настоящего)")
 
     # ---------- замер 5: люфт ----------
     def backlash_test(self, sid: int) -> None:
         s = self.servo(sid)
-        print("\nЗамер 5. Люфт. Указка закреплена на рычаге, луч — на стену.")
+        print("\nЗамер 5. Люфт. Указка закреплена на рычаге (у мини — скотчем на бедре), луч — на стену.")
         dist = self.ask_float("  Расстояние от оси привода до стены, мм", 1000.0) or 1000.0
         if not self.precheck(s):
             return
@@ -266,6 +328,9 @@ class Bench:
 
     # ---------- замер 7: нагрев ----------
     def heat_test(self, sid: int, minutes: float = 10.0) -> None:
+        if self.p.key != "sts3215":
+            print("\nНагрев STS3032 меряем на собранной ноге: пункт «Нога: шаг на месте 10 минут».")
+            return
         s = self.servo(sid)
         print(f"\nЗамер 7. Нагрев: груз 1 кг на рычаге 100 мм (10 кг·см = номинал), {minutes:.0f} мин.")
         self.wait_enter("  Рычаг горизонтально, груз подвешен в отверстие 100 мм, термопара приклеена к корпусу.")
@@ -314,15 +379,16 @@ class Bench:
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M")
         path = Path(f"bench_results_{stamp}.xlsx")
-        report.write(path, self.results, self.log_rows)
+        report.write(path, self.results, self.log_rows, title=f"Харви — стенд {self.p.title}", log_header=self.log_header)
         Path(f"bench_results_{stamp}.json").write_text(
-            json.dumps(dict(results=self.results, heat_log=self.log_rows), ensure_ascii=False, indent=1), encoding="utf-8")
+            json.dumps(dict(servo=self.p.key, results=self.results, log_header=self.log_header, log=self.log_rows),
+                       ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"Отчёт сохранён: {path.resolve()}")
         return path
 
 
 MENU = """
-Стенд привода Харви — что делаем?
+Стенд привода Харви (STS3215, «Компакт») — что делаем?
   1  Найти приводы на шине
   2  Назначить номер приводу (на шине — один привод)
   3  Замер 2: ток покоя и в упоре
@@ -335,21 +401,66 @@ MENU = """
   0  Сохранить отчёт и выйти
 """
 
+MENU_MINI = """
+Стенд «Компакт мини» (STS3032, 6 В) — что делаем?
+  1  Найти приводы на шине
+  2  Назначить номер приводу (на шине — один привод): нога — 1 поворот, 2 бедро, 3 колено
+  3  Центровка перед сборкой: все приводы в середину
+  4  Размеры привода штангенциркулем — в отчёт
+  5  Один привод: ток покоя
+  6  Один привод: скорость
+  7  Один привод: люфт (указка)
+  8  Один привод: точность возврата
+  9  Нога: калибровка нуля и направлений
+ 10  Нога: проверка поз
+ 11  Нога: стойка на весах (300–400 г, 60 с)
+ 12  Нога: момент бедра (упор в весы)
+ 13  Нога: шаг на месте 10 минут — нагрев, ток, батарея
+ 14  Всё с ноги подряд (10–13)
+  0  Сохранить отчёт и выйти
+"""
+
+
+def measure_servo(bench: Bench) -> None:
+    """Размеры, которых нет на чертеже Feetech, — по ним поправим CAD перед печатью."""
+    print("\nРазмеры привода (штангенциркуль, каждый — 3 раза, вводи среднее, мм). «-» — пропустить.")
+    items = [("horn_top", "от торца корпуса до плоскости качалки (вдоль вала)", 4.8),
+             ("shaft_from_end", "от оси вала до ближнего узкого торца корпуса", 5.7),
+             ("body_L", "длина корпуса поперёк вала (без ушек)", 23.0),
+             ("body_D", "корпус вдоль вала, между торцами (без качалок)", 27.5),
+             ("total_D", "вдоль вала вместе с обеими качалками", 37.2)]
+    got = {}
+    for key, text, cad in items:
+        v = bench.ask_float(f"  {key}: {text} (в CAD {str(cad).replace('.', ',')})", cad)
+        if v is None:
+            continue
+        got[key] = v
+        bench.add("р", f"Размер {key}", f"{v:.2f} мм", f"CAD {cad} мм, допуск ±0,3", abs(v - cad) <= 0.3,
+                  "" if abs(v - cad) <= 0.3 else "поправить CAD перед печатью")
+    if got:
+        Path("servo_measurements.json").write_text(json.dumps(got, ensure_ascii=False, indent=1), encoding="utf-8")
+        print("  Записано в servo_measurements.json — пришли файл или отчёт, поправлю CAD.")
+
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Стенд привода STS3215 для Харви")
+    ap = argparse.ArgumentParser(description="Стенд привода Харви: STS3215 («Компакт») или STS3032 и нога («Компакт мини»)")
     ap.add_argument("--port", help="последовательный порт адаптера, например COM5 или /dev/ttyUSB0")
     ap.add_argument("--baud", type=int, default=1_000_000)
-    ap.add_argument("--sim", action="store_true", help="имитация привода без железа")
+    ap.add_argument("--servo", choices=sorted(sts.PROFILES), default="sts3215", help="какой привод на стенде")
+    ap.add_argument("--sim", action="store_true", help="имитация без железа")
     ap.add_argument("--auto", action="store_true", help="ответы по умолчанию (для самопроверки)")
-    ap.add_argument("--heat-min", type=float, default=10.0, help="длительность замера нагрева, мин")
+    ap.add_argument("--heat-min", type=float, default=10.0, help="длительность нагрева / шага на месте, мин")
     args = ap.parse_args(argv)
+    profile = sts.PROFILES[args.servo]
+    mini = profile.key == "sts3032"
 
     if args.sim:
-        from .fake import FakeBus
+        from .fake import FakeBus, FakeLegBus
+        from .leg import GEOM
 
-        bus = FakeBus(ids=(1,), speedup=20.0 if args.auto else 1.0)
-        bench = Bench(bus, auto=args.auto, speedup=bus.speedup, clock=bus.clock)
+        speed = 20.0 if args.auto else 1.0
+        bus = FakeLegBus(GEOM, speedup=speed) if mini else FakeBus(ids=(1,), speedup=speed, profile=profile)
+        bench = Bench(bus, auto=args.auto, speedup=bus.speedup, clock=bus.clock, profile=profile)
     else:
         if not args.port:
             from serial.tools import list_ports
@@ -358,14 +469,50 @@ def main(argv=None) -> int:
             print("Укажи порт: --port <имя>. Найдены порты:", ", ".join(ports) or "нет")
             return 2
         bus = sts.SerialBus(args.port, args.baud)
-        bench = Bench(bus)
+        bench = Bench(bus, profile=profile)
 
     sid = 1
     try:
-        if args.auto:
-            choices = ["1", "9", "0"]
-        else:
-            choices = None
+        if mini:
+            from .leg import Leg
+
+            leg = Leg(bench)
+            choices = ["1", "4", "5", "6", "8", "9", "14", "0"] if args.auto else None
+            while True:
+                print(MENU_MINI)
+                ch = choices.pop(0) if choices else input("Выбор: ").strip()
+                if ch == "1":
+                    found = bench.scan()
+                    if found:
+                        sid = found[0]
+                elif ch == "2":
+                    bench.assign_id()
+                elif ch == "3":
+                    leg.center_all()
+                elif ch == "4":
+                    measure_servo(bench)
+                elif ch in ("5", "6", "7", "8"):
+                    sid = int(bench.ask_float("Номер привода", sid) or sid)
+                    {"5": bench.current_test, "6": bench.speed_test, "7": bench.backlash_test, "8": bench.repeat_test}[ch](sid)
+                elif ch == "9":
+                    leg.calibrate()
+                elif ch == "10":
+                    leg.poses()
+                elif ch == "11":
+                    leg.stance_scale()
+                elif ch == "12":
+                    leg.femur_torque()
+                elif ch == "13":
+                    leg.gait(args.heat_min)
+                elif ch == "14":
+                    leg.poses()
+                    leg.stance_scale()
+                    leg.femur_torque()
+                    leg.gait(args.heat_min)
+                elif ch == "0":
+                    bench.save()
+                    return 0
+        choices = ["1", "9", "0"] if args.auto else None
         while True:
             print(MENU)
             ch = choices.pop(0) if choices else input("Выбор: ").strip()

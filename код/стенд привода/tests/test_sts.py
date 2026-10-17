@@ -74,3 +74,52 @@ def test_fake_bus_set_id_and_move():
     assert abs(s.pos() - 3000) < 5
     bus.write(sts.BROADCAST, sts.TORQUE_ENABLE, 0)
     assert bus.servos[5].mem[sts.TORQUE_ENABLE[0]] == 0
+
+
+def test_state_block_read_matches_single_registers():
+    from harvey_bench.fake import FakeBus
+
+    bus = FakeBus(ids=(1,), speedup=50.0)
+    s = sts.Servo(bus, 1)                                      # момент выключен — привод стоит
+    st = s.state()
+    assert abs(st.pos - s.pos()) <= 2
+    assert st.volt == pytest.approx(12.0, abs=0.2)
+    assert st.current_a > 0
+
+
+def test_profiles_have_sane_norms():
+    p = sts.PROFILES["sts3032"]
+    assert p.vmin < p.volt < p.vmax <= 7.4                     # защита STS3032 выше 7,4 В
+    assert p.stall_nm == pytest.approx(0.44, abs=0.01)
+    assert not p.current_sensor
+
+
+def test_set_middle_makes_position_2048():
+    from harvey_bench.fake import FakeBus
+
+    bus = FakeBus(ids=(1,), speedup=50.0, profile=sts.PROFILES["sts3032"])
+    s = sts.Servo(bus, 1)
+    s.set_middle()
+    assert abs(s.pos() - sts.MIDDLE) <= 1
+
+
+def test_leg_ik_fk_roundtrip_and_stance():
+    import math
+    from harvey_bench.leg import GEOM, STANCE
+
+    r0, h0 = GEOM.stance_target()
+    assert h0 == pytest.approx(-GEOM.zj, abs=1e-6)              # в стойке стопа на столе
+    for dh in (-5.0, 0.0, 8.0, 15.0):
+        qf, qk = GEOM.ik(r0, h0 + dh)
+        r, h = GEOM.foot(math.radians(qf), math.radians(qk))
+        assert (r, h) == pytest.approx((r0, h0 + dh), abs=1e-3)
+    assert GEOM.ik(r0, h0) == pytest.approx(STANCE[1:], abs=1e-6)
+
+
+def test_leg_calibration_mapping():
+    from harvey_bench.leg import LegCal
+
+    cal = LegCal(sign={"coxa": 1, "femur": -1, "knee": 1}, offset={"coxa": 0, "femur": 12, "knee": 0})
+    for j, deg in (("coxa", 15.0), ("femur", 20.0), ("knee", -110.0)):
+        assert cal.to_deg(j, cal.to_pos(j, deg)) == pytest.approx(deg, abs=sts.DEG_PER_STEP)
+    assert cal.to_pos("knee", -90.0) == sts.MIDDLE                # поза «Г» — середина

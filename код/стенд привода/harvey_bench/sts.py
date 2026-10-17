@@ -42,8 +42,37 @@ PRESENT_CURRENT = (69, 2)
 MODEL_STS3215 = 777
 STEPS_PER_REV = 4096
 DEG_PER_STEP = 360.0 / STEPS_PER_REV
+MIDDLE = 2048
+CALIBRATE_MIDDLE = 128        # запись в TORQUE_ENABLE: текущая позиция становится серединой (2048) — даташит STS3032, п. 7-14
 # Масштаб тока: по данным сообщества ~6,5 мА на единицу. Замер №2 сверяет его с экраном блока питания.
 CURRENT_LSB_A = 0.0065
+STATE_BLOCK = (56, 15)        # позиция … ток одним чтением: адреса 56–70
+
+
+@dataclass(frozen=True)
+class Profile:
+    """Привод и нормы стенда для него. Числа — из даташитов Feetech (документы/)."""
+    key: str
+    title: str
+    volt: float                # напряжение стенда, В
+    vmin: float                # допустимое на стенде
+    vmax: float
+    stall_nm: float            # момент в упоре по паспорту, Н·м
+    rated_nm: float            # номинальный момент, Н·м
+    stall_a: float             # ток в упоре по паспорту, А
+    idle_a: float              # ток удержания без нагрузки, А
+    idle_max_a: float          # норма тока покоя
+    t90_spec: float            # поворот на 90° без нагрузки по паспорту, с
+    current_sensor: bool       # есть ли ток в регистрах (у STS3032 по даташиту — нет, только нагрузка)
+    model: int | None          # номер модели в регистре 3 (None — пока не знаем, стенд покажет)
+
+
+PROFILES = {
+    "sts3215": Profile("sts3215", "STS3215-C018 («Компакт»)", 12.0, 10.0, 13.0, 30 * 0.0981, 10 * 0.0981,
+                       2.7, 0.06, 0.10, 0.333, True, MODEL_STS3215),
+    "sts3032": Profile("sts3032", "STS3032-C036 («Компакт мини»)", 6.0, 5.4, 6.6, 4.5 * 0.0981, 1.5 * 0.0981,
+                       1.2, 0.02, 0.08, 0.135, False, None),
+}
 
 
 class BusError(Exception):
@@ -197,13 +226,23 @@ class Servo:
         return to_signed(u16(self.bus.read(self.id, PRESENT_POS)), 15)
 
     def state(self) -> State:
-        pos = to_signed(u16(self.bus.read(self.id, PRESENT_POS)), 15)
-        spd = to_signed(u16(self.bus.read(self.id, PRESENT_SPEED)), 15)
-        load = to_signed(u16(self.bus.read(self.id, PRESENT_LOAD)), 10) / 10.0
-        volt = self.bus.read(self.id, PRESENT_VOLT)[0] / 10.0
-        temp = self.bus.read(self.id, PRESENT_TEMP)[0]
-        cur = to_signed(u16(self.bus.read(self.id, PRESENT_CURRENT)), 15) * self.current_lsb
+        """Всё состояние одним пакетом (адреса 56–70): на USB-адаптере каждое чтение — несколько миллисекунд."""
+        b = self.bus.read(self.id, STATE_BLOCK)
+        at = lambda reg: reg[0] - STATE_BLOCK[0]
+        pos = to_signed(u16(b[at(PRESENT_POS):]), 15)
+        spd = to_signed(u16(b[at(PRESENT_SPEED):]), 15)
+        load = to_signed(u16(b[at(PRESENT_LOAD):]), 10) / 10.0
+        volt = b[at(PRESENT_VOLT)] / 10.0
+        temp = b[at(PRESENT_TEMP)]
+        cur = to_signed(u16(b[at(PRESENT_CURRENT):]), 15) * self.current_lsb
         return State(pos, spd, load, volt, temp, abs(cur))
+
+    def set_middle(self) -> None:
+        """Текущая позиция становится серединой 2048 (запись 128 в адрес 40, поправка хранится в EEPROM)."""
+        self.bus.write(self.id, LOCK, 0)
+        self.bus.write(self.id, TORQUE_ENABLE, CALIBRATE_MIDDLE)
+        time.sleep(0.05)
+        self.bus.write(self.id, LOCK, 1)
 
     def set_id(self, new_id: int) -> None:
         if not 1 <= new_id <= 253:

@@ -23,11 +23,12 @@ def _header(ws, row: int, cols: list[str]) -> None:
         cell.border = BORDER
 
 
-def write(path: Path, results: list[dict], heat_log: list[list]) -> None:
+def write(path: Path, results: list[dict], heat_log: list[list], title: str = "Харви — стенд привода STS3215-C018",
+          log_header: list[str] | None = None) -> None:
     wb = Workbook()
     ws = wb.active
     ws.title = "Результаты"
-    ws["A1"] = "Харви — стенд привода STS3215-C018"
+    ws["A1"] = title
     ws["A1"].font = Font(name=F, bold=True, size=14)
     _header(ws, 3, ["№", "Замер", "Измерено", "Норма", "Итог", "Примечание"])
     for i, r in enumerate(results, 4):
@@ -45,12 +46,13 @@ def write(path: Path, results: list[dict], heat_log: list[list]) -> None:
         ws.column_dimensions[col].width = w
     ws.freeze_panes = "A4"
 
+    header = log_header or ["Время, с", "Температура, °C", "Ток, А", "Напряжение, В", "Позиция"]
     lg = wb.create_sheet("Нагрев")
-    _header(lg, 1, ["Время, с", "Температура, °C", "Ток, А", "Напряжение, В", "Позиция"])
+    _header(lg, 1, header)
     for i, row in enumerate(heat_log, 2):
         for c, v in enumerate(row, 1):
             lg.cell(i, c, v).font = Font(name=F, size=10)
-    for col in "ABCDE":
-        lg.column_dimensions[col].width = 16
+    for c in range(1, len(header) + 1):
+        lg.column_dimensions[lg.cell(1, c).column_letter].width = 16
     lg.freeze_panes = "A2"
     wb.save(path)
