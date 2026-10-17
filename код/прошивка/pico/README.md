@@ -24,9 +24,11 @@
 
 ## Установка (один раз)
 
-1. Скачай MicroPython для **Raspberry Pi Pico 2** (файл `.uf2`, плата RPI_PICO2) с micropython.org.
-2. Зажми кнопку **BOOTSEL** на Pico и подключи USB — появится диск RP2350. Перетащи туда `.uf2` — Pico перезагрузится.
-3. Поставь **Thonny** (thonny.org). Внизу справа выбери интерпретатор «MicroPython (Raspberry Pi Pico)».
+Уже сделано на этом ПК (17.10.2026): Thonny 5.0 установлен, MicroPython скачан, в окружение стенда добавлен `mpremote` (загрузка файлов из командной строки).
+
+1. MicroPython для **Raspberry Pi Pico 2** лежит в `firmware/RPI_PICO2-20260824-v1.29.0.uf2` (в git не хранится — новая версия: micropython.org/download/RPI_PICO2).
+2. Зажми кнопку **BOOTSEL** на Pico и подключи USB — появится диск RP2350. Перетащи туда `.uf2` — Pico перезагрузится, диск пропадёт: это нормально.
+3. Открой **Thonny** (меню «Пуск»). Внизу справа выбери интерпретатор «MicroPython (Raspberry Pi Pico)» — внизу появится `>>>`.
 4. В Thonny открой `sts_bus.py` и `bus_test.py` и сохрани оба **на Pico** (Файл → Сохранить как → Raspberry Pi Pico).
 
 ## Запуск
