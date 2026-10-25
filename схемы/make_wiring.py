@@ -198,12 +198,133 @@ def bus_buffer():
     return d
 
 
+# ------------------------------------------------------------------ лист 3: Pi Zero 2 W — камера, глаза, звук, касание
+# Гребёнка Pi Zero 2 W: физический номер пина → (GPIO, функция). Используются только эти.
+PI_PINS = [
+    (2, "5 В (вход от DC-DC 5 В)"), (4, "5 В → усилитель"), (1, "3,3 В → глаза"), (17, "3,3 В → микрофоны, касание"),
+    (6, "GND"), (9, "GND"), (14, "GND"), (20, "GND"), (25, "GND"),
+    (23, "GPIO11 · SPI0 SCLK"), (19, "GPIO10 · SPI0 MOSI"), (22, "GPIO25 · DC глаз"), (18, "GPIO24 · RST глаз"),
+    (24, "GPIO8 · SPI0 CE0 · левый глаз"), (26, "GPIO7 · SPI0 CE1 · правый глаз"), (32, "GPIO12 · PWM0 · подсветка глаз"),
+    (12, "GPIO18 · I2S BCLK"), (35, "GPIO19 · I2S LRCLK"), (38, "GPIO20 · I2S DIN ← микрофоны"), (40, "GPIO21 · I2S DOUT → усилитель"),
+    (37, "GPIO26 · SD усилителя (тишина)"),
+    (29, "GPIO5 · касание 1"), (31, "GPIO6 · касание 2"), (36, "GPIO16 · касание 3"), (11, "GPIO17 · касание 4"),
+]
+
+
+def pi_sheet():
+    c, w, x = {}, {}, []
+    pin = {p: i + 1 for i, (p, _) in enumerate(PI_PINS)}             # физический пин → номер строки в таблице
+    c["PI"] = {"type": "Raspberry Pi Zero 2 W — гребёнка 40 pin", "subtype": "разводка на плате-переходнике над гребёнкой",
+               "pinlabels": [f"пин {p} · {f}" for p, f in PI_PINS], "show_pincount": False,
+               "notes": "Свободны для запаса: GPIO14/15 (UART), GPIO2/3 (I2C1), GPIO4, GPIO13, GPIO22, GPIO23, GPIO27.<br/>"
+                        "Связь с RP2350 — по USB (лист «Питание и логика»)."}
+    c["PI_CSI"] = {"type": "Pi Zero 2 W — разъём камеры", "subtype": "mini-CSI 22 pin",
+                   "pinlabels": ["GND", "D0−", "D0+", "D1−", "D1+", "CLK−", "CLK+", "CAM_GPIO (вкл.)", "SCL0 (камера)", "SDA0 (камера)", "3,3 В"]}
+    c["CAM"] = {"type": "Camera Module 3 Wide", "subtype": "IMX708, 120°, CSI 15 pin · в передней стенке",
+                "pinlabels": ["GND", "D0−", "D0+", "D1−", "D1+", "CLK−", "CLK+", "CAM_IO0 (вкл.)", "SCL", "SDA", "3,3 В"],
+                "notes": "~200–250 мА от 3,3 В Pi"}
+    for s, nm in (("L", "левый"), ("R", "правый")):
+        c[f"EYE_{s}"] = {"type": f"Глаз {nm}: GC9D01 0,71″", "subtype": "160 × 160, SPI, Ø24 × 4,5 мм · на стебельке",
+                         "pinlabels": ["GND", "VCC 3,3 В", "SCL (SCLK)", "SDA (MOSI)", "RES", "DC", "CS", "BLK"],
+                         "notes": "~15 мА + подсветка ~20 мА · BLK — вход ключа модуля (проверить на плате)"}
+        c[f"MIC_{s}"] = {"type": f"Микрофон {nm}: INMP441", "subtype": "I2S, 24 бит · у боковой стенки",
+                         "pinlabels": ["VDD 3,3 В", "GND", "SCK", "WS", "SD", "L/R"],
+                         "notes": "L/R → GND (левый канал)" if s == "L" else "L/R → VDD (правый канал)"}
+    c["AMP"] = {"type": "Усилитель MAX98357A", "subtype": "I2S, класс D, 3 Вт макс.",
+                "pinlabels": ["VIN 5 В", "GND", "BCLK", "LRC", "DIN", "SD", "OUT+", "OUT−"],
+                "notes": "GAIN не подключён — 9 дБ; SD: 1 — звук, 0 — тишина (через 100 кОм к 3,3 В на плате)"}
+    c["SPK"] = {"type": "Динамик 20 мм", "subtype": "8 Ом, 1 Вт · под решёткой крышки", "pinlabels": ["+", "−"]}
+    for k in range(1, 5):
+        c[f"T{k}"] = {"type": f"Касание {k}: TTP223", "subtype": "на крышке, «погладить»", "pinlabels": ["VCC 3,3 В", "GND", "OUT"]}
+
+    def cab(name, n, gauge, length, colors, note, typ=None):
+        w[name] = {"wirecount": n, "length": length, "colors": colors, "notes": note}
+        if gauge:
+            w[name]["gauge"] = gauge
+        if typ:
+            w[name]["type"] = typ
+
+    cab("W_CAM", 11, None, 0.08, ["BK", "GY", "WH", "GY", "WH", "GY", "WH", "VT", "BU", "YE", "OG"],
+        "шлейф Zero 22 → 15 pin, 5–10 см; MIPI CSI-2, 2 линии", typ="FPC-шлейф")
+    for s in ("L", "R"):
+        cab(f"W_EYE_{s}", 8, "30 AWG", 0.16, ["BK", "OG", "VT", "BU", "GY", "WH", "GN", "YE"],
+            "через стебелёк, с петлёй на поворот глаза −90…+20° · SPI до 32 МГц (тонкий длинный провод)")
+        cab(f"W_MIC_{s}", 5, "30 AWG", 0.10, ["OG", "BK", "VT", "BU", "GN"], "I2S · 3,3 В, ~1,4 мА")
+    cab("W_AMP", 6, "28 AWG", 0.08, ["RD", "BK", "VT", "BU", "YE", "WH"], "5 В · до 0,3 А на громкости")
+    cab("W_SPK", 2, "26 AWG", 0.06, ["RD", "BK"], "до 1 Вт на 8 Ом")
+    for k in range(1, 5):
+        cab(f"W_T{k}", 3, "30 AWG", 0.10, ["OG", "BK", "GN"], "3,3 В · мкА")
+
+    P = lambda *ps: [pin[p] for p in ps]
+    x.append([{"PI_CSI": list(range(1, 12))}, {"W_CAM": list(range(1, 12))}, {"CAM": list(range(1, 12))}])
+    x.append([{"PI": P(6, 1, 23, 19, 18, 22, 24, 32)}, {"W_EYE_L": list(range(1, 9))}, {"EYE_L": list(range(1, 9))}])
+    x.append([{"PI": P(9, 1, 23, 19, 18, 22, 26, 32)}, {"W_EYE_R": list(range(1, 9))}, {"EYE_R": list(range(1, 9))}])
+    for s, g in (("L", 14), ("R", 20)):
+        x.append([{"PI": P(17, g, 12, 35, 38)}, {f"W_MIC_{s}": [1, 2, 3, 4, 5]}, {f"MIC_{s}": [1, 2, 3, 4, 5]}])
+    x.append([{"PI": P(4, 25, 12, 35, 40, 37)}, {"W_AMP": [1, 2, 3, 4, 5, 6]}, {"AMP": [1, 2, 3, 4, 5, 6]}])
+    x.append([{"AMP": [7, 8]}, {"W_SPK": [1, 2]}, {"SPK": [1, 2]}])
+    for k, g in zip(range(1, 5), (29, 31, 36, 11)):
+        x.append([{"PI": P(17, 25, g)}, {f"W_T{k}": [1, 2, 3]}, {f"T{k}": [1, 2, 3]}])
+    return {"metadata": {"title": "Харви «Компакт мини» — Pi Zero 2 W: камера, глаза, звук, касание"}, "options": OPT,
+            "connectors": c, "cables": w, "connections": x}
+
+
+# ------------------------------------------------------------------ лист 4: RP2350-Zero — датчики
+# Все 20 выводов RP2350-Zero (GP0–GP15, GP26–GP29). Предварительное назначение.
+RP_MAP = [
+    ("GP0", "шина A · UART0 TX"), ("GP1", "шина A · UART0 RX"), ("GP2", "XSHUT датчика края 1 (вперёд, слева)"),
+    ("GP3", "XSHUT датчика края 2 (вперёд, справа)"), ("GP4", "шина B · UART1 TX"), ("GP5", "шина B · UART1 RX"),
+    ("GP6", "XSHUT датчика края 3 (назад, слева)"), ("GP7", "XSHUT датчика края 4 (назад, справа)"),
+    ("GP8", "шина C · PIO UART TX"), ("GP9", "шина C · PIO UART RX"), ("GP10", "XSHUT датчика края 5 (бок, слева)"),
+    ("GP11", "XSHUT датчика края 6 (бок, справа)"), ("GP12", "I2C0 SDA"), ("GP13", "I2C0 SCL"),
+    ("GP14", "ИК-приёмник маяка, слева"), ("GP15", "ИК-приёмник маяка, справа"), ("GP26", "INT1 BMI270 (рывок, падение, «подняли»)"),
+    ("GP27", "ALERT INA226 (батарея, перегрузка)"), ("GP28", "резерв · АЦП"), ("GP29", "резерв · АЦП"),
+]
+EDGE = [("вперёд, слева", "GP2"), ("вперёд, справа", "GP3"), ("назад, слева", "GP6"), ("назад, справа", "GP7"),
+        ("бок, слева", "GP10"), ("бок, справа", "GP11")]
+
+
+def rp_sheet():
+    c, w, x = {}, {}, []
+    lab = ["3V3 (выход)", "GND"] + [f"{g} · {f}" for g, f in RP_MAP if not f.startswith("шина")]
+    idx = {l.split(" · ")[0]: i + 1 for i, l in enumerate(lab)}
+    c["RP"] = {"type": "RP2350-Zero", "subtype": "датчики (шины приводов — лист «Шины приводов»)", "pinlabels": lab, "show_pincount": False,
+               "notes": "Заняты все 20 выводов: касание перенесено на Pi Zero, резерв — GP28, GP29 (АЦП)"}
+    c["SH"] = {"type": "Плата шин — разъёмы датчиков", "subtype": "I2C0 на 3,3 В, подтяжка 2,2 кОм (на модулях подтяжки снять)",
+               "pinlabels": ["3,3 В", "GND", "SDA", "SCL"], "notes": "звезда от платы шин к каждому датчику"}
+    for k, (where, g) in enumerate(EDGE, 1):
+        c[f"VL{k}"] = {"type": f"Датчик края {k}: VL53L4CD", "subtype": f"{where} · у дна, луч к столу",
+                       "pinlabels": ["VIN 3,3 В", "GND", "SDA", "SCL", "XSHUT"],
+                       "notes": "адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес"}
+        w[f"W_VL{k}"] = {"wirecount": 5, "gauge": "30 AWG", "length": 0.12, "colors": ["OG", "BK", "BU", "YE", "GN"],
+                         "notes": "I2C 400 кГц · ~20 мА при измерении"}
+        x.append([{"SH": [1, 2, 3, 4]}, {f"W_VL{k}": [1, 2, 3, 4]}, {f"VL{k}": [1, 2, 3, 4]}])
+        x.append([{"RP": [idx[g]]}, {f"W_VL{k}": [5]}, {f"VL{k}": [5]}])
+    c["IMU"] = {"type": "IMU BMI270", "subtype": "в центре корпуса, на стойке у Pi", "pinlabels": ["VCC 3,3 В", "GND", "SDA", "SCL", "INT1"]}
+    w["W_IMU"] = {"wirecount": 5, "gauge": "30 AWG", "length": 0.08, "colors": ["OG", "BK", "BU", "YE", "VT"], "notes": "I2C · ~1 мА"}
+    x.append([{"SH": [1, 2, 3, 4]}, {"W_IMU": [1, 2, 3, 4]}, {"IMU": [1, 2, 3, 4]}])
+    x.append([{"RP": [idx["GP26"]]}, {"W_IMU": [5]}, {"IMU": [5]}])
+    w["W_I2C"] = {"wirecount": 4, "gauge": "28 AWG", "length": 0.06, "colors": ["OG", "BK", "BU", "YE"], "notes": "I2C0 к плате шин"}
+    x.append([{"RP": [idx["3V3 (выход)"], idx["GND"], idx["GP12"], idx["GP13"]]}, {"W_I2C": [1, 2, 3, 4]}, {"SH": [1, 2, 3, 4]}])
+    c["INA"] = {"type": "INA226 на плате питания", "subtype": "I2C — лист «Питание и логика»", "pinlabels": ["ALERT"]}
+    w["W_ALERT"] = {"wirecount": 1, "gauge": "30 AWG", "length": 0.10, "colors": ["WH"], "notes": "низкий заряд / перегрузка → прерывание"}
+    x.append([{"RP": [idx["GP27"]]}, {"W_ALERT": [1]}, {"INA": [1]}])
+    for k, (nm, g) in enumerate((("слева", "GP14"), ("справа", "GP15")), 1):
+        c[f"IR{k}"] = {"type": f"ИК-приёмник {nm}: TSOP38238", "subtype": "38 кГц · в передней стенке у камеры",
+                       "pinlabels": ["VS 3,3 В", "GND", "OUT"], "notes": "найти станцию без ПК: сравнить сигнал слева и справа"}
+        w[f"W_IR{k}"] = {"wirecount": 3, "gauge": "30 AWG", "length": 0.08, "colors": ["OG", "BK", "GN"], "notes": "~0,4 мА"}
+        x.append([{"RP": [idx["3V3 (выход)"], idx["GND"], idx[g]]}, {f"W_IR{k}": [1, 2, 3]}, {f"IR{k}": [1, 2, 3]}])
+    return {"metadata": {"title": "Харви «Компакт мини» — RP2350: датчики"}, "options": OPT,
+            "connectors": c, "cables": w, "connections": x}
+
+
 def render(name, data):
     path = os.path.join(HERE, name + ".yml")
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
     exe = os.path.join(os.path.dirname(sys.executable), "wireviz.exe")
-    subprocess.run([exe if os.path.exists(exe) else "wireviz", "-f", "hpst", path], check=True)
+    env = dict(os.environ, PYTHONUTF8="1")            # WireViz читает файлы кодировкой по умолчанию — в Windows это cp1251
+    subprocess.run([exe if os.path.exists(exe) else "wireviz", "-f", "hpst", path], check=True, env=env)
     print("готово:", name)
 
 
@@ -211,6 +332,8 @@ if __name__ == "__main__":
     os.environ["PATH"] = r"C:\Program Files\Graphviz\bin;" + os.environ.get("PATH", "")
     render("mini_power", power_sheet())
     render("mini_bus", bus_sheet())
+    render("mini_pi", pi_sheet())
+    render("mini_sensors", rp_sheet())
     d = bus_buffer()
     d.save(os.path.join(HERE, "bus_buffer.svg"))
     d.save(os.path.join(HERE, "bus_buffer.png"), dpi=150)

@@ -1,0 +1,20 @@
+Id	Description	Qty	Unit	Designators
+1	Cable, 2 x 26 AWG	0.06	m	W_SPK
+2	Cable, 3 x 30 AWG	0.4	m	W_T1, W_T2, W_T3, W_T4
+3	Cable, 5 x 30 AWG	0.2	m	W_MIC_L, W_MIC_R
+4	Cable, 6 x 28 AWG	0.08	m	W_AMP
+5	Cable, 8 x 30 AWG	0.32	m	W_EYE_L, W_EYE_R
+6	Cable, FPC-шлейф, 11 wires	0.08	m	W_CAM
+7	Connector, Camera Module 3 Wide, IMX708, 120°, CSI 15 pin · в передней стенке, 11 pins	1		CAM
+8	Connector, Pi Zero 2 W — разъём камеры, mini-CSI 22 pin, 11 pins	1		PI_CSI
+9	Connector, Raspberry Pi Zero 2 W — гребёнка 40 pin, разводка на плате-переходнике над гребёнкой	1		PI
+10	Connector, Глаз левый: GC9D01 0,71″, 160 × 160, SPI, Ø24 × 4,5 мм · на стебельке, 8 pins	1		EYE_L
+11	Connector, Глаз правый: GC9D01 0,71″, 160 × 160, SPI, Ø24 × 4,5 мм · на стебельке, 8 pins	1		EYE_R
+12	Connector, Динамик 20 мм, 8 Ом, 1 Вт · под решёткой крышки, 2 pins	1		SPK
+13	Connector, Касание 1: TTP223, на крышке, «погладить», 3 pins	1		T1
+14	Connector, Касание 2: TTP223, на крышке, «погладить», 3 pins	1		T2
+15	Connector, Касание 3: TTP223, на крышке, «погладить», 3 pins	1		T3
+16	Connector, Касание 4: TTP223, на крышке, «погладить», 3 pins	1		T4
+17	Connector, Микрофон левый: INMP441, I2S, 24 бит · у боковой стенки, 6 pins	1		MIC_L
+18	Connector, Микрофон правый: INMP441, I2S, 24 бит · у боковой стенки, 6 pins	1		MIC_R
+19	Connector, Усилитель MAX98357A, I2S, класс D, 3 Вт макс., 8 pins	1		AMP

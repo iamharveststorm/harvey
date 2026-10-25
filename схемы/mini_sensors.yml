@@ -1,0 +1,439 @@
+metadata:
+  title: 'Харви «Компакт мини» — RP2350: датчики'
+options:
+  fontname: Arial
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  color_mode: full
+  mini_bom_mode: false
+connectors:
+  RP:
+    type: RP2350-Zero
+    subtype: датчики (шины приводов — лист «Шины приводов»)
+    pinlabels:
+    - 3V3 (выход)
+    - GND
+    - GP2 · XSHUT датчика края 1 (вперёд, слева)
+    - GP3 · XSHUT датчика края 2 (вперёд, справа)
+    - GP6 · XSHUT датчика края 3 (назад, слева)
+    - GP7 · XSHUT датчика края 4 (назад, справа)
+    - GP10 · XSHUT датчика края 5 (бок, слева)
+    - GP11 · XSHUT датчика края 6 (бок, справа)
+    - GP12 · I2C0 SDA
+    - GP13 · I2C0 SCL
+    - GP14 · ИК-приёмник маяка, слева
+    - GP15 · ИК-приёмник маяка, справа
+    - GP26 · INT1 BMI270 (рывок, падение, «подняли»)
+    - GP27 · ALERT INA226 (батарея, перегрузка)
+    - GP28 · резерв · АЦП
+    - GP29 · резерв · АЦП
+    show_pincount: false
+    notes: 'Заняты все 20 выводов: касание перенесено на Pi Zero, резерв — GP28, GP29
+      (АЦП)'
+  SH:
+    type: Плата шин — разъёмы датчиков
+    subtype: I2C0 на 3,3 В, подтяжка 2,2 кОм (на модулях подтяжки снять)
+    pinlabels:
+    - 3,3 В
+    - GND
+    - SDA
+    - SCL
+    notes: звезда от платы шин к каждому датчику
+  VL1:
+    type: 'Датчик края 1: VL53L4CD'
+    subtype: вперёд, слева · у дна, луч к столу
+    pinlabels:
+    - VIN 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - XSHUT
+    notes: 'адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес'
+  VL2:
+    type: 'Датчик края 2: VL53L4CD'
+    subtype: вперёд, справа · у дна, луч к столу
+    pinlabels:
+    - VIN 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - XSHUT
+    notes: 'адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес'
+  VL3:
+    type: 'Датчик края 3: VL53L4CD'
+    subtype: назад, слева · у дна, луч к столу
+    pinlabels:
+    - VIN 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - XSHUT
+    notes: 'адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес'
+  VL4:
+    type: 'Датчик края 4: VL53L4CD'
+    subtype: назад, справа · у дна, луч к столу
+    pinlabels:
+    - VIN 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - XSHUT
+    notes: 'адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес'
+  VL5:
+    type: 'Датчик края 5: VL53L4CD'
+    subtype: бок, слева · у дна, луч к столу
+    pinlabels:
+    - VIN 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - XSHUT
+    notes: 'адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес'
+  VL6:
+    type: 'Датчик края 6: VL53L4CD'
+    subtype: бок, справа · у дна, луч к столу
+    pinlabels:
+    - VIN 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - XSHUT
+    notes: 'адрес раздаётся при включении: по очереди поднять XSHUT и сменить адрес'
+  IMU:
+    type: IMU BMI270
+    subtype: в центре корпуса, на стойке у Pi
+    pinlabels:
+    - VCC 3,3 В
+    - GND
+    - SDA
+    - SCL
+    - INT1
+  INA:
+    type: INA226 на плате питания
+    subtype: I2C — лист «Питание и логика»
+    pinlabels:
+    - ALERT
+  IR1:
+    type: 'ИК-приёмник слева: TSOP38238'
+    subtype: 38 кГц · в передней стенке у камеры
+    pinlabels:
+    - VS 3,3 В
+    - GND
+    - OUT
+    notes: 'найти станцию без ПК: сравнить сигнал слева и справа'
+  IR2:
+    type: 'ИК-приёмник справа: TSOP38238'
+    subtype: 38 кГц · в передней стенке у камеры
+    pinlabels:
+    - VS 3,3 В
+    - GND
+    - OUT
+    notes: 'найти станцию без ПК: сравнить сигнал слева и справа'
+cables:
+  W_VL1:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.12
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - GN
+    notes: I2C 400 кГц · ~20 мА при измерении
+  W_VL2:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.12
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - GN
+    notes: I2C 400 кГц · ~20 мА при измерении
+  W_VL3:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.12
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - GN
+    notes: I2C 400 кГц · ~20 мА при измерении
+  W_VL4:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.12
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - GN
+    notes: I2C 400 кГц · ~20 мА при измерении
+  W_VL5:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.12
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - GN
+    notes: I2C 400 кГц · ~20 мА при измерении
+  W_VL6:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.12
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - GN
+    notes: I2C 400 кГц · ~20 мА при измерении
+  W_IMU:
+    wirecount: 5
+    gauge: 30 AWG
+    length: 0.08
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    - VT
+    notes: I2C · ~1 мА
+  W_I2C:
+    wirecount: 4
+    gauge: 28 AWG
+    length: 0.06
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    notes: I2C0 к плате шин
+  W_ALERT:
+    wirecount: 1
+    gauge: 30 AWG
+    length: 0.1
+    colors:
+    - WH
+    notes: низкий заряд / перегрузка → прерывание
+  W_IR1:
+    wirecount: 3
+    gauge: 30 AWG
+    length: 0.08
+    colors:
+    - OG
+    - BK
+    - GN
+    notes: ~0,4 мА
+  W_IR2:
+    wirecount: 3
+    gauge: 30 AWG
+    length: 0.08
+    colors:
+    - OG
+    - BK
+    - GN
+    notes: ~0,4 мА
+connections:
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_VL1:
+    - 1
+    - 2
+    - 3
+    - 4
+  - VL1:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 3
+  - W_VL1:
+    - 5
+  - VL1:
+    - 5
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_VL2:
+    - 1
+    - 2
+    - 3
+    - 4
+  - VL2:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 4
+  - W_VL2:
+    - 5
+  - VL2:
+    - 5
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_VL3:
+    - 1
+    - 2
+    - 3
+    - 4
+  - VL3:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 5
+  - W_VL3:
+    - 5
+  - VL3:
+    - 5
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_VL4:
+    - 1
+    - 2
+    - 3
+    - 4
+  - VL4:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 6
+  - W_VL4:
+    - 5
+  - VL4:
+    - 5
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_VL5:
+    - 1
+    - 2
+    - 3
+    - 4
+  - VL5:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 7
+  - W_VL5:
+    - 5
+  - VL5:
+    - 5
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_VL6:
+    - 1
+    - 2
+    - 3
+    - 4
+  - VL6:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 8
+  - W_VL6:
+    - 5
+  - VL6:
+    - 5
+- - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+  - W_IMU:
+    - 1
+    - 2
+    - 3
+    - 4
+  - IMU:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 13
+  - W_IMU:
+    - 5
+  - IMU:
+    - 5
+- - RP:
+    - 1
+    - 2
+    - 9
+    - 10
+  - W_I2C:
+    - 1
+    - 2
+    - 3
+    - 4
+  - SH:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 14
+  - W_ALERT:
+    - 1
+  - INA:
+    - 1
+- - RP:
+    - 1
+    - 2
+    - 11
+  - W_IR1:
+    - 1
+    - 2
+    - 3
+  - IR1:
+    - 1
+    - 2
+    - 3
+- - RP:
+    - 1
+    - 2
+    - 12
+  - W_IR2:
+    - 1
+    - 2
+    - 3
+  - IR2:
+    - 1
+    - 2
+    - 3

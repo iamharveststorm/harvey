@@ -1,0 +1,17 @@
+Id	Description	Qty	Unit	Designators
+1	Cable, 1 x 30 AWG	0.1	m	W_ALERT
+2	Cable, 3 x 30 AWG	0.16	m	W_IR1, W_IR2
+3	Cable, 4 x 28 AWG	0.06	m	W_I2C
+4	Cable, 5 x 30 AWG	0.8	m	W_IMU, W_VL1, W_VL2, W_VL3, W_VL4, W_VL5, W_VL6
+5	Connector, IMU BMI270, в центре корпуса, на стойке у Pi, 5 pins	1		IMU
+6	Connector, INA226 на плате питания, I2C — лист «Питание и логика», 1 pins	1		INA
+7	Connector, RP2350-Zero, датчики (шины приводов — лист «Шины приводов»)	1		RP
+8	Connector, Датчик края 1: VL53L4CD, вперёд, слева · у дна, луч к столу, 5 pins	1		VL1
+9	Connector, Датчик края 2: VL53L4CD, вперёд, справа · у дна, луч к столу, 5 pins	1		VL2
+10	Connector, Датчик края 3: VL53L4CD, назад, слева · у дна, луч к столу, 5 pins	1		VL3
+11	Connector, Датчик края 4: VL53L4CD, назад, справа · у дна, луч к столу, 5 pins	1		VL4
+12	Connector, Датчик края 5: VL53L4CD, бок, слева · у дна, луч к столу, 5 pins	1		VL5
+13	Connector, Датчик края 6: VL53L4CD, бок, справа · у дна, луч к столу, 5 pins	1		VL6
+14	Connector, ИК-приёмник слева: TSOP38238, 38 кГц · в передней стенке у камеры, 3 pins	1		IR1
+15	Connector, ИК-приёмник справа: TSOP38238, 38 кГц · в передней стенке у камеры, 3 pins	1		IR2
+16	Connector, Плата шин — разъёмы датчиков, I2C0 на 3,3 В, подтяжка 2,2 кОм (на модулях подтяжки снять), 4 pins	1		SH

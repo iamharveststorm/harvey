@@ -1,0 +1,501 @@
+metadata:
+  title: 'Харви «Компакт мини» — Pi Zero 2 W: камера, глаза, звук, касание'
+options:
+  fontname: Arial
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  color_mode: full
+  mini_bom_mode: false
+connectors:
+  PI:
+    type: Raspberry Pi Zero 2 W — гребёнка 40 pin
+    subtype: разводка на плате-переходнике над гребёнкой
+    pinlabels:
+    - пин 2 · 5 В (вход от DC-DC 5 В)
+    - пин 4 · 5 В → усилитель
+    - пин 1 · 3,3 В → глаза
+    - пин 17 · 3,3 В → микрофоны, касание
+    - пин 6 · GND
+    - пин 9 · GND
+    - пин 14 · GND
+    - пин 20 · GND
+    - пин 25 · GND
+    - пин 23 · GPIO11 · SPI0 SCLK
+    - пин 19 · GPIO10 · SPI0 MOSI
+    - пин 22 · GPIO25 · DC глаз
+    - пин 18 · GPIO24 · RST глаз
+    - пин 24 · GPIO8 · SPI0 CE0 · левый глаз
+    - пин 26 · GPIO7 · SPI0 CE1 · правый глаз
+    - пин 32 · GPIO12 · PWM0 · подсветка глаз
+    - пин 12 · GPIO18 · I2S BCLK
+    - пин 35 · GPIO19 · I2S LRCLK
+    - пин 38 · GPIO20 · I2S DIN ← микрофоны
+    - пин 40 · GPIO21 · I2S DOUT → усилитель
+    - пин 37 · GPIO26 · SD усилителя (тишина)
+    - пин 29 · GPIO5 · касание 1
+    - пин 31 · GPIO6 · касание 2
+    - пин 36 · GPIO16 · касание 3
+    - пин 11 · GPIO17 · касание 4
+    show_pincount: false
+    notes: 'Свободны для запаса: GPIO14/15 (UART), GPIO2/3 (I2C1), GPIO4, GPIO13,
+      GPIO22, GPIO23, GPIO27.<br/>Связь с RP2350 — по USB (лист «Питание и логика»).'
+  PI_CSI:
+    type: Pi Zero 2 W — разъём камеры
+    subtype: mini-CSI 22 pin
+    pinlabels:
+    - GND
+    - D0−
+    - D0+
+    - D1−
+    - D1+
+    - CLK−
+    - CLK+
+    - CAM_GPIO (вкл.)
+    - SCL0 (камера)
+    - SDA0 (камера)
+    - 3,3 В
+  CAM:
+    type: Camera Module 3 Wide
+    subtype: IMX708, 120°, CSI 15 pin · в передней стенке
+    pinlabels:
+    - GND
+    - D0−
+    - D0+
+    - D1−
+    - D1+
+    - CLK−
+    - CLK+
+    - CAM_IO0 (вкл.)
+    - SCL
+    - SDA
+    - 3,3 В
+    notes: ~200–250 мА от 3,3 В Pi
+  EYE_L:
+    type: 'Глаз левый: GC9D01 0,71″'
+    subtype: 160 × 160, SPI, Ø24 × 4,5 мм · на стебельке
+    pinlabels:
+    - GND
+    - VCC 3,3 В
+    - SCL (SCLK)
+    - SDA (MOSI)
+    - RES
+    - DC
+    - CS
+    - BLK
+    notes: ~15 мА + подсветка ~20 мА · BLK — вход ключа модуля (проверить на плате)
+  MIC_L:
+    type: 'Микрофон левый: INMP441'
+    subtype: I2S, 24 бит · у боковой стенки
+    pinlabels:
+    - VDD 3,3 В
+    - GND
+    - SCK
+    - WS
+    - SD
+    - L/R
+    notes: L/R → GND (левый канал)
+  EYE_R:
+    type: 'Глаз правый: GC9D01 0,71″'
+    subtype: 160 × 160, SPI, Ø24 × 4,5 мм · на стебельке
+    pinlabels:
+    - GND
+    - VCC 3,3 В
+    - SCL (SCLK)
+    - SDA (MOSI)
+    - RES
+    - DC
+    - CS
+    - BLK
+    notes: ~15 мА + подсветка ~20 мА · BLK — вход ключа модуля (проверить на плате)
+  MIC_R:
+    type: 'Микрофон правый: INMP441'
+    subtype: I2S, 24 бит · у боковой стенки
+    pinlabels:
+    - VDD 3,3 В
+    - GND
+    - SCK
+    - WS
+    - SD
+    - L/R
+    notes: L/R → VDD (правый канал)
+  AMP:
+    type: Усилитель MAX98357A
+    subtype: I2S, класс D, 3 Вт макс.
+    pinlabels:
+    - VIN 5 В
+    - GND
+    - BCLK
+    - LRC
+    - DIN
+    - SD
+    - OUT+
+    - OUT−
+    notes: 'GAIN не подключён — 9 дБ; SD: 1 — звук, 0 — тишина (через 100 кОм к 3,3
+      В на плате)'
+  SPK:
+    type: Динамик 20 мм
+    subtype: 8 Ом, 1 Вт · под решёткой крышки
+    pinlabels:
+    - +
+    - −
+  T1:
+    type: 'Касание 1: TTP223'
+    subtype: на крышке, «погладить»
+    pinlabels:
+    - VCC 3,3 В
+    - GND
+    - OUT
+  T2:
+    type: 'Касание 2: TTP223'
+    subtype: на крышке, «погладить»
+    pinlabels:
+    - VCC 3,3 В
+    - GND
+    - OUT
+  T3:
+    type: 'Касание 3: TTP223'
+    subtype: на крышке, «погладить»
+    pinlabels:
+    - VCC 3,3 В
+    - GND
+    - OUT
+  T4:
+    type: 'Касание 4: TTP223'
+    subtype: на крышке, «погладить»
+    pinlabels:
+    - VCC 3,3 В
+    - GND
+    - OUT
+cables:
+  W_CAM:
+    wirecount: 11
+    length: 0.08
+    colors:
+    - BK
+    - GY
+    - WH
+    - GY
+    - WH
+    - GY
+    - WH
+    - VT
+    - BU
+    - YE
+    - OG
+    notes: шлейф Zero 22 → 15 pin, 5–10 см; MIPI CSI-2, 2 линии
+    type: FPC-шлейф
+  W_EYE_L:
+    wirecount: 8
+    length: 0.16
+    colors:
+    - BK
+    - OG
+    - VT
+    - BU
+    - GY
+    - WH
+    - GN
+    - YE
+    notes: через стебелёк, с петлёй на поворот глаза −90…+20° · SPI до 32 МГц (тонкий
+      длинный провод)
+    gauge: 30 AWG
+  W_MIC_L:
+    wirecount: 5
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - VT
+    - BU
+    - GN
+    notes: I2S · 3,3 В, ~1,4 мА
+    gauge: 30 AWG
+  W_EYE_R:
+    wirecount: 8
+    length: 0.16
+    colors:
+    - BK
+    - OG
+    - VT
+    - BU
+    - GY
+    - WH
+    - GN
+    - YE
+    notes: через стебелёк, с петлёй на поворот глаза −90…+20° · SPI до 32 МГц (тонкий
+      длинный провод)
+    gauge: 30 AWG
+  W_MIC_R:
+    wirecount: 5
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - VT
+    - BU
+    - GN
+    notes: I2S · 3,3 В, ~1,4 мА
+    gauge: 30 AWG
+  W_AMP:
+    wirecount: 6
+    length: 0.08
+    colors:
+    - RD
+    - BK
+    - VT
+    - BU
+    - YE
+    - WH
+    notes: 5 В · до 0,3 А на громкости
+    gauge: 28 AWG
+  W_SPK:
+    wirecount: 2
+    length: 0.06
+    colors:
+    - RD
+    - BK
+    notes: до 1 Вт на 8 Ом
+    gauge: 26 AWG
+  W_T1:
+    wirecount: 3
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - GN
+    notes: 3,3 В · мкА
+    gauge: 30 AWG
+  W_T2:
+    wirecount: 3
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - GN
+    notes: 3,3 В · мкА
+    gauge: 30 AWG
+  W_T3:
+    wirecount: 3
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - GN
+    notes: 3,3 В · мкА
+    gauge: 30 AWG
+  W_T4:
+    wirecount: 3
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - GN
+    notes: 3,3 В · мкА
+    gauge: 30 AWG
+connections:
+- - PI_CSI:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+  - W_CAM:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+  - CAM:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+- - PI:
+    - 5
+    - 3
+    - 10
+    - 11
+    - 13
+    - 12
+    - 14
+    - 16
+  - W_EYE_L:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+  - EYE_L:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+- - PI:
+    - 6
+    - 3
+    - 10
+    - 11
+    - 13
+    - 12
+    - 15
+    - 16
+  - W_EYE_R:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+  - EYE_R:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+- - PI:
+    - 4
+    - 7
+    - 17
+    - 18
+    - 19
+  - W_MIC_L:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  - MIC_L:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+- - PI:
+    - 4
+    - 8
+    - 17
+    - 18
+    - 19
+  - W_MIC_R:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  - MIC_R:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+- - PI:
+    - 2
+    - 9
+    - 17
+    - 18
+    - 20
+    - 21
+  - W_AMP:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+  - AMP:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+- - AMP:
+    - 7
+    - 8
+  - W_SPK:
+    - 1
+    - 2
+  - SPK:
+    - 1
+    - 2
+- - PI:
+    - 4
+    - 9
+    - 22
+  - W_T1:
+    - 1
+    - 2
+    - 3
+  - T1:
+    - 1
+    - 2
+    - 3
+- - PI:
+    - 4
+    - 9
+    - 23
+  - W_T2:
+    - 1
+    - 2
+    - 3
+  - T2:
+    - 1
+    - 2
+    - 3
+- - PI:
+    - 4
+    - 9
+    - 24
+  - W_T3:
+    - 1
+    - 2
+    - 3
+  - T3:
+    - 1
+    - 2
+    - 3
+- - PI:
+    - 4
+    - 9
+    - 25
+  - W_T4:
+    - 1
+    - 2
+    - 3
+  - T4:
+    - 1
+    - 2
+    - 3
