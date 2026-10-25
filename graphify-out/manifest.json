@@ -114,10 +114,10 @@
     "semantic_hash": "dce7fc2b0e05e48b9a58fbc11a03080c"
   },
   "CLAUDE.md": {
-    "mtime": 1792136754.727008,
-    "seen": 1792248248.3116202,
-    "ast_hash": "b468285ee11465723de4ef9efb4d0214",
-    "semantic_hash": "b468285ee11465723de4ef9efb4d0214"
+    "mtime": 1792916226.1442146,
+    "seen": 1792916244.2948935,
+    "ast_hash": "426a22b4717ebc543a4d739066fca2db",
+    "semantic_hash": ""
   },
   "README.md": {
     "mtime": 1792907801.2037258,
@@ -138,16 +138,16 @@
     "semantic_hash": "77709f31e617ee56102736572ef25486"
   },
   "\u0425\u0430\u0440\u0432\u0438.md": {
-    "mtime": 1792907801.2037258,
-    "seen": 1792909036.9951336,
-    "ast_hash": "c07be411f082f7739b48184f472d50c2",
-    "semantic_hash": "c07be411f082f7739b48184f472d50c2"
+    "mtime": 1792916226.1392133,
+    "seen": 1792916244.294904,
+    "ast_hash": "39346c60c68b622b147a68e6ab7ffcdf",
+    "semantic_hash": ""
   },
   "\u0437\u0430\u043c\u0435\u0442\u043a\u0438/\u0416\u0443\u0440\u043d\u0430\u043b \u0440\u0435\u0448\u0435\u043d\u0438\u0439.md": {
-    "mtime": 1792907801.2210097,
-    "seen": 1792909036.995142,
-    "ast_hash": "5468e62a0cc0f8499accbc0b8d946967",
-    "semantic_hash": "5468e62a0cc0f8499accbc0b8d946967"
+    "mtime": 1792916226.1512144,
+    "seen": 1792916244.294913,
+    "ast_hash": "2bd8a8c277522a5a83229a3294004544",
+    "semantic_hash": ""
   },
   "\u0437\u0430\u043c\u0435\u0442\u043a\u0438/\u041a\u043e\u043c\u043f\u043b\u0435\u043a\u0442\u0430\u0446\u0438\u044f \u0438 \u0431\u044e\u0434\u0436\u0435\u0442 v0.2.md": {
     "mtime": 1792036526.0524542,
@@ -492,16 +492,16 @@
     "semantic_hash": "0dcaa3ff3a674897a0764209ecb0a396"
   },
   "\u0437\u0430\u043c\u0435\u0442\u043a\u0438/\u041a\u043e\u043c\u043f\u0430\u043a\u0442 \u043c\u0438\u043d\u0438.md": {
-    "mtime": 1792247307.2248216,
-    "seen": 1792248248.3116326,
-    "ast_hash": "91ead8250a90cd1943841b62a2471476",
-    "semantic_hash": "91ead8250a90cd1943841b62a2471476"
+    "mtime": 1792916226.1292086,
+    "seen": 1792916244.2949154,
+    "ast_hash": "53a303b524038462b65614ec6f300fc3",
+    "semantic_hash": ""
   },
   "\u0437\u0430\u043c\u0435\u0442\u043a\u0438/\u041a\u043e\u043c\u043f\u043b\u0435\u043a\u0442\u0430\u0446\u0438\u044f \u043c\u0438\u043d\u0438.md": {
-    "mtime": 1792907801.2140062,
-    "seen": 1792909036.995147,
-    "ast_hash": "86be0c369e9a6ecd340579f3fee3b063",
-    "semantic_hash": "86be0c369e9a6ecd340579f3fee3b063"
+    "mtime": 1792916226.13421,
+    "seen": 1792916244.2949193,
+    "ast_hash": "0562f68c9745e3d5ea51f495389c6852",
+    "semantic_hash": ""
   },
   "\u0437\u0430\u043c\u0435\u0442\u043a\u0438/\u0427\u0435\u043a-\u043b\u0438\u0441\u0442 \u0441\u0442\u0435\u043d\u0434\u0430 \u043c\u0438\u043d\u0438.md": {
     "mtime": 1792907801.2130065,
@@ -779,10 +779,64 @@
     "ast_hash": "4ec708fe5593a8da7da7a3cdfdab38c6",
     "semantic_hash": "4ec708fe5593a8da7da7a3cdfdab38c6"
   },
-  "\u0437\u0430\u043c\u0435\u0442\u043a\u0438.md": {
-    "mtime": 1792306022.5164108,
-    "seen": 1792909036.9951367,
-    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
-    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  "\u0441\u0445\u0435\u043c\u044b/make_wiring.py": {
+    "mtime": 1792916099.1418965,
+    "seen": 1792916244.2948906,
+    "ast_hash": "79e3ad84eb806cb940151bfe807f42fc",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/README.md": {
+    "mtime": 1792916185.4341578,
+    "seen": 1792916244.294968,
+    "ast_hash": "7b256cd324f35bb5ecbf11bcabe73fe6",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/mini_bus.yml": {
+    "mtime": 1792916202.5170982,
+    "seen": 1792916244.2949698,
+    "ast_hash": "de9becfd7a6936221d935541f6ed3078",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/mini_power.yml": {
+    "mtime": 1792916201.1111298,
+    "seen": 1792916244.2949715,
+    "ast_hash": "5aeb35224a5f46af7a0261de75f09acb",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/bus_buffer.png": {
+    "mtime": 1792916204.7252188,
+    "seen": 1792916244.2950547,
+    "ast_hash": "c8417d3ca32d72cad2241439809e46e8",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/bus_buffer.svg": {
+    "mtime": 1792916204.5201476,
+    "seen": 1792916244.295056,
+    "ast_hash": "a386c62516036d1cbf35b7316cee9b7b",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/mini_bus.png": {
+    "mtime": 1792916203.5281215,
+    "seen": 1792916244.2950573,
+    "ast_hash": "a6f59983145c9568bfe83092dacb0525",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/mini_bus.svg": {
+    "mtime": 1792916203.6645293,
+    "seen": 1792916244.295059,
+    "ast_hash": "2b3813e00db5d60dff73010873af66c9",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/mini_power.png": {
+    "mtime": 1792916202.3770933,
+    "seen": 1792916244.2950602,
+    "ast_hash": "d19cbc61e92e9b364cb71a96fbdf5cf7",
+    "semantic_hash": ""
+  },
+  "\u0441\u0445\u0435\u043c\u044b/mini_power.svg": {
+    "mtime": 1792916202.472887,
+    "seen": 1792916244.2950616,
+    "ast_hash": "c3fc4c8893552f5570897deb126161ee",
+    "semantic_hash": ""
   }
 }
