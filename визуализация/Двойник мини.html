@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Двойник «Компакт мини»</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E4E9EC;--ink:#1F2A31;--muted:#56636C;--panel:rgba(250,251,252,.94);--line:#C9D2D7;--accent:#2F7F86;--accent-ink:#fff;--ok:#2E7D4F;--bad:#B3261E;--warn:#A86400;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#151B1F;--ink:#E8EDF0;--muted:#9AA7AF;--panel:rgba(26,33,38,.94);--line:#33414A;--accent:#5FB8BF;--accent-ink:#0E1A1C;--ok:#6FCF97;--bad:#FF8A80;--warn:#FFB74D}}
+:root[data-theme="dark"]{--bg:#151B1F;--ink:#E8EDF0;--muted:#9AA7AF;--panel:rgba(26,33,38,.94);--line:#33414A;--accent:#5FB8BF;--accent-ink:#0E1A1C;--ok:#6FCF97;--bad:#FF8A80;--warn:#FFB74D}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Golos Text","Segoe UI",system-ui,sans-serif;overflow:hidden;font-size:14px}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+h1{font-family:"Unbounded","Golos Text",system-ui,sans-serif;font-weight:600;font-size:22px;margin:0 0 4px}
+.panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:310px;overflow-y:auto;padding:14px;border-radius:16px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.panel p.lead{margin:0 0 10px;color:var(--muted);line-height:1.4}
+.ver{display:flex;gap:6px;margin:0 0 8px}
+.ver a,.ver span{font-size:13px;padding:5px 10px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none}
+.ver span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+fieldset{border:0;border-top:1px solid var(--line);margin:10px 0 0;padding:10px 0 0}
+legend{font-weight:600;padding:0 6px 0 0}
+label.s{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:8px 0 0;align-items:center}
+label.s input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+label.s output{font-variant-numeric:tabular-nums;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:10px;padding:7px 10px;cursor:pointer;min-height:34px}
+button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:6px}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+.report{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;width:300px;max-height:calc(100% - 24px);overflow-y:auto;padding:14px;border-radius:16px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.report dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px}
+.report dt{color:var(--muted)}
+.report dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+#coll{margin:10px 0 0;padding:10px 0 0;border-top:1px solid var(--line);color:var(--muted);line-height:1.45}
+.toggle{display:none}
+@media (max-width:760px){
+  .panel{top:auto;left:0;right:0;width:auto;bottom:0;max-height:52vh;border-radius:16px 16px 0 0;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
+  .panel.hidden{display:none}
+  .report{top:calc(env(safe-area-inset-top,0px) + 8px);right:8px;left:8px;width:auto;max-height:30vh;padding:10px 12px;font-size:13px}
+  .toggle{display:block;position:fixed;right:12px;bottom:calc(52vh + 10px);z-index:2;background:var(--panel)}
+  .panel.hidden ~ .toggle{bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
+}
+</style>
+</head>
+<body>
+<div id="stage" aria-label="Трёхмерный двойник Харви «Компакт мини»"></div>
+<aside class="panel" id="panel">
+  <h1>Двойник мини</h1>
+  <nav class="ver" aria-label="Версия"><a href="Интерактивный двойник.html">«Компакт»</a><span aria-current="page">«Компакт мини»</span></nav>
+  <p class="lead">Детали из CAD мини (28 × STS3032, без хвоста). Двигайте корпус, клешни и глаза — справа видно правила движения, опору, момент бедра, что видит камера и датчики края.</p>
+  <fieldset><legend>Поза корпуса</legend>
+    <div class="row"><button data-pose="stand" aria-pressed="true">Стоит</button><button data-pose="crouch">Присел</button><button data-pose="face">Смотрит на тебя</button><button data-pose="look">Смотрит вниз</button><button data-pose="rest">На брюхе</button></div>
+    <label class="s">Высота осей бедра, мм<output id="o_h"></output><input type="range" id="h" min="18" max="46" step="0.5" value="37.7"></label>
+    <label class="s">Расставить ноги, мм<output id="o_st"></output><input type="range" id="st" min="42" max="70" step="0.5" value="55.2"></label>
+    <label class="s">Наклон: нос вниз (+) / вверх (−)<output id="o_pitch"></output><input type="range" id="pitch" min="-12" max="12" step="0.5" value="0"></label>
+    <label class="s">Крен вбок<output id="o_roll"></output><input type="range" id="roll" min="-10" max="10" step="0.5" value="0"></label>
+  </fieldset>
+  <fieldset><legend>Клешни (углы приводов)</legend>
+    <div class="row"><button data-arm="tuck" aria-pressed="true">Поджато</button><button data-arm="table">К столу</button><button data-arm="give">Подать</button><button data-arm="wave">Привет</button><button data-arm="up">Вверх</button></div>
+    <label class="s">Поворот плеча: наружу (+), °<output id="o_qy"></output><input type="range" id="qy" min="-10" max="70" step="1" value="8"></label>
+    <label class="s">Подъём, °<output id="o_qp"></output><input type="range" id="qp" min="-20" max="90" step="1" value="50"></label>
+    <label class="s">Локоть, °<output id="o_qe"></output><input type="range" id="qe" min="-140" max="60" step="1" value="-130"></label>
+    <label class="s">Губки: раскрыть (−) / сжать (+), °<output id="o_qg"></output><input type="range" id="qg" min="-50" max="12" step="1" value="10"></label>
+    <label class="chk"><input type="checkbox" id="sync" checked> Обе клешни одинаково</label>
+    <label class="chk"><input type="radio" name="side" id="sideL" checked> двигать левую</label>
+    <label class="chk"><input type="radio" name="side" id="sideR"> двигать правую</label>
+  </fieldset>
+  <fieldset><legend>Глаза и стол</legend>
+    <label class="s">Наклон глаз: внутрь (+) / наружу (−), °<output id="o_qs"></output><input type="range" id="qs" min="-90" max="20" step="1" value="0"></label>
+    <label class="chk"><input type="checkbox" id="rule2" checked> Правило 2: клешня выше 60° — свой глаз наружу на 45°</label>
+    <label class="s">Край стола впереди, мм<output id="o_edge"></output><input type="range" id="edge" min="70" max="400" step="5" value="300"></label>
+  </fieldset>
+  <fieldset><legend>Показать</legend>
+    <label class="chk"><input type="checkbox" id="vReach"> Досягаемость губок (разрешённые позы)</label>
+    <label class="chk"><input type="checkbox" id="vCam" checked> Поле зрения камеры</label>
+    <label class="chk"><input type="checkbox" id="vEdge" checked> Лучи 6 датчиков края</label>
+    <label class="chk"><input type="checkbox" id="vSup" checked> Опора и центр масс</label>
+    <label class="chk"><input type="checkbox" id="vTri"> Только трипод (худшая фаза шага)</label>
+  </fieldset>
+</aside>
+<button class="toggle" id="tog" aria-controls="panel" aria-expanded="true">Настройки</button>
+<section class="report" aria-live="polite">
+  <dl>
+    <dt>Габарит</dt><dd id="r_size"></dd>
+    <dt>Просвет под брюхом</dt><dd id="r_clear"></dd>
+    <dt>Ноги</dt><dd id="r_legs"></dd>
+    <dt>Запас устойчивости</dt><dd id="r_marg"></dd>
+    <dt>Бедро, худший случай</dt><dd id="r_tq"></dd>
+    <dt>Клешни: правила</dt><dd id="r_arm"></dd>
+    <dt>Губки над столом</dt><dd id="r_tip"></dd>
+    <dt>Камера видит губки</dt><dd id="r_camtip"></dd>
+    <dt>Камере закрыто клешнями</dt><dd id="r_block"></dd>
+    <dt>Камера видит лицо</dt><dd id="r_camface"></dd>
+    <dt>Датчики края</dt><dd id="r_edge"></dd>
+  </dl>
+  <div id="coll"></div>
+</section>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="lib/harvey_mini_meshes.js"></script>
+<script>
+(function(){
+const D=Math.PI/180, $=id=>document.getElementById(id);
+// ---------------- размеры из CAD мини (мм): модели/мини/harvey_mini_parts.py → lib/harvey_mini_meshes.js ----------------
+const HM=window.HARVEY_MINI||{geo:{G:{}},meshes:{}}, G=HM.geo.G, GX=HM.geo.GX, GY=HM.geo.GY, MS=HM.geo.masses;
+const COX=G.cox, FEM=G.fem, TIB=G.tib, FR=G.foot_r, L2=TIB-FR, A1=G.a1, FORE=G.fore;
+const JAW_MID=GX+15, JAW_END=GX+26;
+const [BX0,BX1,BY0,BY1,BZ0,BZ1]=G.body;
+const ZJ=TIB-FEM*Math.sin(20*D), REACH=COX+FEM*Math.cos(20*D);
+const MOUNTS=Object.entries(G.mounts).map(([n,v])=>({n,x:v[0],y:v[1],yaw:v[2]}));
+const TRI_A=['RF','LM','RB'];
+const LIM={coxa:20,femLo:-45,femHi:85,kneeLo:-130,kneeHi:-60};          // правило 3
+const CAM={x:66.2,z:8.5,V:67,H:99};                                      // Camera Module 3 Wide в передней стенке, кадр 16 : 9
+const FACE=[500,0,400];                                                  // лицо человека за столом: 50 см впереди, 40 см над столом
+const EDGE_S=[[BX1+2,9,1,0],[BX1+2,-9,1,0],[BX0-2,9,-1,0],[BX0-2,-9,-1,0],[-20,BY1+2,0,1],[-20,BY0-2,0,-1]];   // x, y, вперёд/назад, бок
+const SIDE={L:1,R:-1};
+const limbM=6*(MS.coxa+MS.femur+MS.tibia)+2*(MS.ay+MS.up+MS.fore+MS.hand+MS.jaw)+2*MS.eye, TORSO_M=MS.total-limbM;
+const RATED=0.147;                                                       // Н·м, STS3032 номинал (паспорт 1,5 кг·см)
+
+// ---------------- сцена: всё в системе робота (x вперёд, y влево, z вверх, мм) внутри группы W ----------------
+const stage=$('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2)); renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.shadowMap.enabled=true; stage.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const cam=new THREE.PerspectiveCamera(34,1,1,6000); cam.position.set(330,210,-250);   // спереди слева
+const ctl=new THREE.OrbitControls(cam,renderer.domElement); ctl.target.set(20,30,0); ctl.enableDamping=true; ctl.maxPolarAngle=Math.PI*0.495;
+scene.add(new THREE.HemisphereLight(0xffffff,0x8a7b66,0.7));
+const sun=new THREE.DirectionalLight(0xffffff,0.8); sun.position.set(-150,400,-200); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024);
+Object.assign(sun.shadow.camera,{left:-250,right:250,top:250,bottom:-250}); scene.add(sun);
+const W=new THREE.Group(); W.rotation.x=-Math.PI/2; scene.add(W);      // z робота → Y three
+const MSd=(c,r=.55,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const mat={printed:MSd(0xEB611F,.55),grey:MSd(0x33383F,.45,.1),servo:MSd(0x15161A,.45,.1),tpu:MSd(0x111214,.9),pcb:MSd(0x1A5C36,.5),battery:MSd(0x1C6B87,.4),
+  screen:new THREE.MeshStandardMaterial({color:0x5FE6FF,emissive:0x5FE6FF,emissiveIntensity:.9}),bad:MSd(0xE53935,.4),table:MSd(0xCDB89A,.85)};
+function hmesh(name){
+  const g=new THREE.Group(); g.userData.meshes=[];
+  (HM.meshes[name]||[]).forEach(d=>{
+    const bin=atob(d.v), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    const q=new Int16Array(u8.buffer), f=new Float32Array(q.length); for(let i=0;i<q.length;i++)f[i]=q[i]*d.s;
+    const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(f,3)); geo.computeVertexNormals();
+    const m=new THREE.Mesh(geo,mat[d.m]||mat.printed); m.castShadow=true; m.receiveShadow=true; g.add(m); g.userData.meshes.push(m);});
+  return g;
+}
+const tableGeo=new THREE.BoxGeometry(1,1,1), table=new THREE.Mesh(tableGeo,mat.table); table.receiveShadow=true; W.add(table);
+function setTable(edge){const back=500, len=edge+back; table.scale.set(len,900,12); table.position.set(edge-len/2,0,-6);}
+const face=new THREE.Mesh(new THREE.SphereGeometry(45,24,16),MSd(0xF2C9A6,.8)); face.position.set(...FACE); W.add(face);
+
+// ---------------- робот ----------------
+const T=new THREE.Group(); W.add(T); T.rotation.order='ZYX';
+T.add(hmesh('torso'));
+const legs=MOUNTS.map(m=>{
+  const c=new THREE.Group(); c.position.set(m.x,m.y,0); T.add(c); const cm=hmesh('leg_coxa'); c.add(cm);
+  const f=new THREE.Group(); f.position.set(COX,0,0); c.add(f); const fm=hmesh('leg_femur'); f.add(fm);
+  const k=new THREE.Group(); k.position.set(FEM,0,0); f.add(k); const km=hmesh('leg_tibia'); k.add(km);
+  return {...m,c,f,k,parts:[...cm.userData.meshes,...fm.userData.meshes,...km.userData.meshes]};
+});
+const arms=['L','R'].map(s=>{
+  const sg=SIDE[s], P=G.arm_s[s];
+  const ay=new THREE.Group(); ay.position.set(...P); T.add(ay); ay.add(hmesh(s+'_ay'));
+  const up=new THREE.Group(); ay.add(up); const um=hmesh(s+'_up'); up.add(um);
+  const fo=new THREE.Group(); fo.position.set(A1,0,0); up.add(fo); const fm=hmesh(s+'_fore'); fo.add(fm);
+  const hd=new THREE.Group(); hd.position.set(FORE,0,0); fo.add(hd); const hm=hmesh(s+'_hand'); hd.add(hm);
+  const jw=new THREE.Group(); jw.position.set(GX,sg*GY,0); hd.add(jw); const jm=hmesh(s+'_jaw'); jw.add(jm);
+  return {s,sg,ay,up,fo,hd,jw,parts:[...um.userData.meshes,...fm.userData.meshes,...hm.userData.meshes,...jm.userData.meshes],q:[8,50,-130],pts:{}};
+});
+const eyes=['L','R'].map(s=>{
+  const e=new THREE.Group(); e.position.set(...G.eye[s]); T.add(e); e.add(hmesh(s+'_eye'));
+  return {s,sg:SIDE[s],e};
+});
+const camMark=new THREE.Object3D(); camMark.position.set(CAM.x,0,CAM.z); T.add(camMark);
+
+// ---------------- кинематика (как код/симуляция/мини/harvey_mini.py) ----------------
+function legIK(lg,footW,inv){
+  const fb=footW.clone().applyMatrix4(inv);
+  const dx=fb.x-lg.x, dy=fb.y-lg.y, a=lg.yaw*D;
+  const lx=Math.cos(a)*dx+Math.sin(a)*dy, ly=-Math.sin(a)*dx+Math.cos(a)*dy;
+  const qc=Math.atan2(ly,lx), rr=Math.hypot(lx,ly)-COX, h=fb.z, dRaw=Math.hypot(rr,h);
+  const d=Math.min(Math.max(dRaw,Math.abs(L2-FEM)+1e-3),FEM+L2-1e-3);
+  const qf=Math.atan2(h,rr)+Math.acos(Math.max(-1,Math.min(1,(FEM*FEM+d*d-L2*L2)/(2*FEM*d))));
+  const qk=-(Math.PI-Math.acos(Math.max(-1,Math.min(1,(FEM*FEM+L2*L2-d*d)/(2*FEM*L2)))));
+  const reach=dRaw<=FEM+L2&&dRaw>=Math.abs(L2-FEM);
+  const ok=reach&&Math.abs(qc/D)<=LIM.coxa&&qf/D>=LIM.femLo&&qf/D<=LIM.femHi&&qk/D>=LIM.kneeLo&&qk/D<=LIM.kneeHi;
+  return {qc,qf,qk,ok};
+}
+function armIK(s,p,tipx){ // p — точка на губках в системе корпуса (мм); «локоть вверх»
+  const [x,y,z]=G.arm_s[s], sg=SIDE[s];
+  const dx=p[0]-x, dy=p[1]-y, dz=p[2]-z, qy=sg*Math.atan2(dy,dx), r=Math.hypot(dx,dy), A2=FORE+tipx;
+  const d=Math.min(Math.hypot(r,dz),A1+A2-1e-3);
+  const qe=Math.acos(Math.max(-1,Math.min(1,(A1*A1+A2*A2-d*d)/(2*A1*A2))))-Math.PI;
+  const qp=Math.atan2(dz,r)+Math.acos(Math.max(-1,Math.min(1,(A1*A1+d*d-A2*A2)/(2*A1*d))));
+  return [qy/D,qp/D,qe/D];
+}
+function clawPoints(s,qy,qp,qe){ // локоть, запястье, конец губок в системе корпуса — как claw_points в CAD
+  const [x,y,z]=G.arm_s[s], sg=SIDE[s], a=qp*D, b=(qp+qe)*D;
+  const p=[[A1*Math.cos(a),A1*Math.sin(a)]]; p.push([p[0][0]+FORE*Math.cos(b),p[0][1]+FORE*Math.sin(b)]);
+  p.push([p[1][0]+(GX+26)*Math.cos(b),p[1][1]+(GX+26)*Math.sin(b)]);
+  const c=Math.cos(qy*D), sn=Math.sin(qy*D);
+  return p.map(([r,h])=>[x+r*c,y+sg*r*sn,z+h]);
+}
+function clawRule(s,qy,qp,qe){ // правила 1, 4, 5 (claw_ok в CAD): '' — можно, иначе причина
+  if(!(qy>=-10&&qy<=70&&qp>=-20&&qp<=90&&qe>=-140&&qe<=60))return 'предел сустава';
+  const pts=clawPoints(s,qy,qp,qe), low=pts.some(p=>p[2]<=BZ1+3);
+  if(low&&qy>8)return 'низко: наружу ≤ 8° (передняя нога)';
+  if(qp>=60&&qy<0)return 'поднята: только прямо или наружу';
+  if(!pts.every(p=>p[0]>BX1+3||p[2]>BZ1+3))return 'ниже крышки за переднюю кромку';
+  return '';
+}
+
+// ---------------- вспомогательная графика (в системе W) ----------------
+const helpers=new THREE.Group(); W.add(helpers);
+const lineMat=c=>new THREE.LineBasicMaterial({color:c});
+function mkLine(n,c){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*3),3));const l=new THREE.Line(g,lineMat(c));helpers.add(l);return l}
+function mkSegs(n,c){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*3),3));const l=new THREE.LineSegments(g,lineMat(c));helpers.add(l);return l}
+function setPts(l,arr){const a=l.geometry.attributes.position;arr.forEach((v,i)=>a.setXYZ(i,v.x,v.y,v.z));a.needsUpdate=true;l.geometry.setDrawRange(0,arr.length);l.geometry.computeBoundingSphere()}
+const supLine=mkLine(8,0x2E7D4F);
+const comMark=new THREE.Mesh(new THREE.CylinderGeometry(4,4,1.5,20),MSd(0xE53935)); comMark.rotation.x=Math.PI/2; helpers.add(comMark);
+const camSegs=mkSegs(16,0x2F7F86);
+const camFoot=new THREE.Mesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial({color:0x2F7F86,transparent:true,opacity:.16,side:THREE.DoubleSide})); helpers.add(camFoot);
+const edgeLines=EDGE_S.map(()=>mkLine(2,0xA86400));
+const edgeDots=EDGE_S.map(()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(2.5,10,8),MSd(0xA86400));helpers.add(m);return m});
+const reach=(function(){ // концы губок во всех разрешённых позах (в системе корпуса)
+  const pos=[],col=[],c=new THREE.Color();
+  ['L','R'].forEach(s=>{for(let qp=-20;qp<=90;qp+=6)for(let qe=-140;qe<=60;qe+=8)for(let qy=-10;qy<=70;qy+=8){
+    if(clawRule(s,qy,qp,qe))continue; const p=clawPoints(s,qy,qp,qe)[2];
+    pos.push(p[0],p[1],p[2]); c.setHSL(0.55-Math.min(1,Math.max(0,(p[2]+40)/160))*0.5,0.7,0.5); col.push(c.r,c.g,c.b);}});
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  const p=new THREE.Points(g,new THREE.PointsMaterial({size:2.5,vertexColors:true,transparent:true,opacity:.55})); T.add(p); return p;})();
+
+// ---------------- состояние ----------------
+const S={h:ZJ,st:REACH,pitch:0,roll:0,arm:{L:[8,50,-130,10],R:[8,50,-130,10]},qs:0,edge:300};
+const POSES={stand:{h:ZJ,st:REACH,pitch:0,roll:0},crouch:{h:ZJ-14,st:REACH,pitch:0,roll:0},look:{h:ZJ,st:REACH,pitch:12,roll:0},face:{h:ZJ,st:REACH,pitch:-12,roll:0},rest:{h:-BZ0,st:REACH+5,pitch:0,roll:0}};
+function armPreset(k){
+  const out={};
+  ['L','R'].forEach(s=>{const y=G.arm_s[s][1];
+    if(k==='tuck')out[s]=[8,50,-130,10];
+    else if(k==='table'){const q=armIK(s,[112,y,-S.h+12],JAW_MID);out[s]=[...q,-30];}
+    else if(k==='give'){const q=armIK(s,[120,y,75],JAW_MID);out[s]=[...q,10];}
+    else if(k==='wave')out[s]=s==='L'?[25,75,-55,-30]:[8,50,-130,10];
+    else if(k==='up')out[s]=[0,85,-20,10];});
+  return out;
+}
+function footsWorld(){return MOUNTS.map(m=>new THREE.Vector3(m.x+S.st*Math.cos(m.yaw*D),m.y+S.st*Math.sin(m.yaw*D),FR));}
+let footW=footsWorld();
+
+// ---------------- проверки ----------------
+function segDist(p1,q1,p2,q2){
+  const d1=q1.clone().sub(p1),d2=q2.clone().sub(p2),r=p1.clone().sub(p2);
+  const a=d1.dot(d1),e=d2.dot(d2),f=d2.dot(r); let s,t;
+  if(a<1e-9&&e<1e-9)return p1.distanceTo(p2);
+  if(a<1e-9){s=0;t=Math.min(1,Math.max(0,f/e));}else{const c=d1.dot(r);if(e<1e-9){t=0;s=Math.min(1,Math.max(0,-c/a));}else{const b=d1.dot(d2),den=a*e-b*b;s=den>1e-9?Math.min(1,Math.max(0,(b*f-c*e)/den)):0;t=(b*s+f)/e;if(t<0){t=0;s=Math.min(1,Math.max(0,-c/a));}else if(t>1){t=1;s=Math.min(1,Math.max(0,(b-c)/a));}}}
+  return p1.clone().add(d1.multiplyScalar(s)).distanceTo(p2.clone().add(d2.multiplyScalar(t)));
+}
+function boxDist(pW,inv){const p=pW.clone().applyMatrix4(inv);
+  return Math.hypot(Math.max(BX0-p.x,p.x-BX1,0),Math.max(BY0-p.y,p.y-BY1,0),Math.max(BZ0-p.z,p.z-BZ1,0));}
+const wp=o=>{const v=new THREE.Vector3();o.updateWorldMatrix(true,false);v.setFromMatrixPosition(o.matrixWorld);return v.applyMatrix4(new THREE.Matrix4().copy(W.matrixWorld).invert());};
+const inW=(o,x,y,z)=>{const v=new THREE.Vector3(x,y,z);o.updateWorldMatrix(true,false);v.applyMatrix4(o.matrixWorld);return v.applyMatrix4(new THREE.Matrix4().copy(W.matrixWorld).invert());};
+
+// ---------------- обновление ----------------
+function update(){
+  T.position.set(0,0,S.h); T.rotation.set(S.roll*D,S.pitch*D,0);
+  T.updateMatrix(); const bm=T.matrix.clone(), inv=bm.clone().invert();
+  // глаза: правило 2
+  const eyeQ={L:S.qs,R:S.qs};
+  if($('rule2').checked)['L','R'].forEach(s=>{if(S.arm[s][1]>=60)eyeQ[s]=-45;});
+  eyes.forEach(e=>{e.e.rotation.x=e.sg*eyeQ[e.s]*D;});
+  // ноги
+  let legsOk=0;
+  legs.forEach((lg,i)=>{const r=legIK(lg,footW[i],inv);
+    lg.c.rotation.z=lg.yaw*D+r.qc; lg.f.rotation.y=-r.qf; lg.k.rotation.y=-r.qk; lg.ok=r.ok; lg.qf=r.qf; if(r.ok)legsOk++;
+    lg.parts.forEach(m=>{if(!m.userData.m)m.userData.m=m.material;m.material=r.ok?m.userData.m:mat.bad;});});
+  // клешни
+  const why=[];
+  arms.forEach(a=>{const [qy,qp,qe,qg]=S.arm[a.s];
+    a.ay.rotation.z=a.sg*qy*D; a.up.rotation.y=-qp*D; a.fo.rotation.y=-qe*D; a.jw.rotation.z=a.sg*qg*D;
+    a.rule=clawRule(a.s,qy,qp,qe); if(a.rule)why.push((a.s==='L'?'левая: ':'правая: ')+a.rule);
+    a.parts.forEach(m=>{if(!m.userData.m)m.userData.m=m.material;m.material=a.rule?mat.bad:m.userData.m;});});
+  W.updateMatrixWorld(true);
+  arms.forEach(a=>{a.pts.sh=wp(a.up); a.pts.el=wp(a.fo); a.pts.wr=wp(a.hd); a.pts.tip=inW(a.hd,JAW_END,0,0); a.pts.mid=inW(a.hd,JAW_MID,0,0);});
+  // столкновения
+  const coll=[], segs=[];
+  arms.forEach(a=>{const n=a.s==='L'?'левой':'правой';
+    segs.push({n:'плечо '+n+' клешни',a:a.pts.sh.clone().lerp(a.pts.el,0.35),b:a.pts.el,r:7,s:a.s},{n:'предплечье '+n,a:a.pts.el,b:a.pts.wr,r:6,s:a.s},{n:'кисть '+n,a:a.pts.wr,b:a.pts.tip,r:7,rt:2,s:a.s});});
+  const obs=[];
+  eyes.forEach(e=>{const base=wp(e.e), top=inW(e.e,0,0,G.stalk), ctr=inW(e.e,0,0,G.stalk+G.disp_d/2);
+    obs.push({n:(e.s==='L'?'левый':'правый')+' глаз',a:ctr,b:ctr,r:G.disp_d/2},{n:(e.s==='L'?'левый':'правый')+' стебелёк',a:base,b:top,r:3});});
+  legs.forEach(lg=>{const p=wp(lg.f),k=wp(lg.k),f=inW(lg.k,L2,0,0);obs.push({n:'бедро '+lg.n,a:p,b:k,r:7},{n:'голень '+lg.n,a:k,b:f,r:5});});
+  segs.forEach(sg=>{
+    obs.forEach(o=>{if(segDist(sg.a,sg.b,o.a,o.b)<sg.r+o.r)coll.push(sg.n+' ↔ '+o.n);});
+    for(let k=0;k<=8;k++){const p=sg.a.clone().lerp(sg.b,k/8);if(boxDist(p,inv)<sg.r-2){coll.push(sg.n+' ↔ корпус');break;}}
+    const rt=sg.rt||sg.r;                                               // губками стола касаться можно — так и берут предметы
+    for(let k=0;k<=8;k++){const p=sg.a.clone().lerp(sg.b,k/8);if(p.z<rt-4){coll.push(sg.n+' ↔ стол');break;}}});
+  const sL=segs.filter(x=>x.s==='L'),sR=segs.filter(x=>x.s==='R');
+  sL.forEach(a=>sR.forEach(b=>{if(segDist(a.a,a.b,b.a,b.b)<a.r+b.r)coll.push(a.n+' ↔ '+b.n);}));
+  // центр масс и опора
+  let mass=0; const com=new THREE.Vector3(); const add=(m,p)=>{com.addScaledVector(p,m);mass+=m;};
+  add(TORSO_M,new THREE.Vector3((BX0+BX1)/2,0,(BZ0+BZ1)/2).applyMatrix4(bm));
+  legs.forEach(lg=>{add(MS.coxa,inW(lg.c,COX/2,0,0));add(MS.femur,inW(lg.f,FEM/2,0,0));add(MS.tibia,inW(lg.k,L2/2,0,0));});
+  arms.forEach(a=>{add(MS.ay,wp(a.ay));add(MS.up,inW(a.up,A1/2,0,0));add(MS.fore,inW(a.fo,FORE/2,0,0));add(MS.hand+MS.jaw,a.pts.mid);});
+  eyes.forEach(e=>add(MS.eye,inW(e.e,0,0,G.stalk)));
+  com.multiplyScalar(1/mass);
+  const sup=legs.map((lg,i)=>({n:lg.n,p:footW[i]})).filter(x=>!$('vTri').checked||TRI_A.includes(x.n));
+  const c0=sup.reduce((s,x)=>s.add(x.p),new THREE.Vector3()).multiplyScalar(1/sup.length);
+  sup.sort((A,B)=>Math.atan2(A.p.y-c0.y,A.p.x-c0.x)-Math.atan2(B.p.y-c0.y,B.p.x-c0.x));
+  let marg=1e9;
+  for(let i=0;i<sup.length;i++){const a=sup[i].p,b=sup[(i+1)%sup.length].p, ex=b.x-a.x, ey=b.y-a.y, L=Math.hypot(ex,ey);
+    marg=Math.min(marg,(ex*(com.y-a.y)-ey*(com.x-a.x))/L);}
+  setPts(supLine,[...sup.map(x=>new THREE.Vector3(x.p.x,x.p.y,0.6)),new THREE.Vector3(sup[0].p.x,sup[0].p.y,0.6)]);
+  comMark.position.set(com.x,com.y,0.8); comMark.material.color.set(marg>8?0x2E7D4F:(marg>0?0xA86400:0xE53935));
+  let lever=0; legs.forEach((lg,i)=>{const p=wp(lg.f);lever=Math.max(lever,Math.hypot(footW[i].x-p.x,footW[i].y-p.y));});
+  const tq=0.5*mass*9.81*lever/1000;                                  // масса — кг, плечо — мм
+  // камера
+  const camPos=wp(camMark), Rq=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(bm));
+  const fw=new THREE.Vector3(1,0,0).applyQuaternion(Rq), lf=new THREE.Vector3(0,1,0).applyQuaternion(Rq), upv=new THREE.Vector3(0,0,1).applyQuaternion(Rq);
+  const th=Math.tan(CAM.H/2*D), tv=Math.tan(CAM.V/2*D);
+  const ray=(x,y)=>fw.clone().addScaledVector(lf,-x*th).addScaledVector(upv,y*tv).normalize();
+  const corners=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>ray(x,y));
+  const segPts=[],ground=[];
+  corners.forEach(d=>{const t=d.z<-1e-3?Math.min(500,-camPos.z/d.z):300;const end=camPos.clone().addScaledVector(d,t);segPts.push(camPos,end);ground.push(d.z<-1e-3?end:null);});
+  for(let i=0;i<4;i++)segPts.push(segPts[i*2+1],segPts[((i+1)%4)*2+1]);
+  setPts(camSegs,segPts);
+  if(ground.every(Boolean)){const g=new THREE.BufferGeometry();const v=ground.map(p=>[p.x,p.y,0.4]);g.setAttribute('position',new THREE.Float32BufferAttribute([...v[0],...v[1],...v[2],...v[0],...v[2],...v[3]],3));camFoot.geometry.dispose();camFoot.geometry=g;camFoot.visible=$('vCam').checked;}else camFoot.visible=false;
+  const inView=p=>{const v=p.clone().sub(camPos);const z=v.dot(fw);if(z<=0)return false;return Math.abs(Math.atan2(-v.dot(lf),z))<=CAM.H/2*D&&Math.abs(Math.atan2(v.dot(upv),z))<=CAM.V/2*D;};
+  const tipSeen=arms.map(a=>inView(a.pts.mid)), faceSeen=inView(face.position.clone());
+  // доля кадра, закрытая клешнями: сетка лучей против капсул клешней
+  let blocked=0,total=0;
+  for(let i=0;i<=16;i++)for(let j=0;j<=10;j++){const d=ray(-1+i/8,-1+j/5), far=camPos.clone().addScaledVector(d,400);total++;
+    if(segs.some(sg=>segDist(camPos,far,sg.a,sg.b)<sg.r))blocked++;}
+  const centre=segs.some(sg=>segDist(camPos,camPos.clone().addScaledVector(fw,400),sg.a,sg.b)<sg.r);
+  const blockPct=Math.round(blocked/total*100);
+  // датчики края
+  const edgeTxt={f:'',b:'',s:''}; let edgeBad=false;
+  EDGE_S.forEach(([x,y,fb,sd],i)=>{
+    const p=new THREE.Vector3(x,y,BZ0+6.5).applyMatrix4(bm);
+    const dl=new THREE.Vector3(fb?2.3*fb:0,sd?3.5*sd:0,-1).normalize().applyQuaternion(Rq);
+    const t=dl.z<0?-p.z/dl.z:200, hit=p.clone().addScaledVector(dl,Math.min(t,300));
+    setPts(edgeLines[i],[p,hit]); edgeDots[i].position.copy(hit);
+    const blockedRay=segs.some(sg=>segDist(p,hit,sg.a,sg.b)<sg.r)||legs.some(lg=>segDist(p,hit,wp(lg.k),inW(lg.k,L2,0,0))<5);
+    const past=hit.x>S.edge;
+    edgeLines[i].material.color.set(blockedRay?0xE53935:(past?0x2E7D4F:0xA86400));
+    if(blockedRay)edgeBad=true;
+    const key=fb>0?'f':(fb<0?'b':'s'); const st=blockedRay?'закрыт':(past?'край!':'стол');
+    if(!edgeTxt[key]||st!=='стол')edgeTxt[key]=st;});
+  const feetPast=footW.some(f=>f.x>S.edge-FR);
+  // отчёт
+  const xs=[],ys=[]; footW.forEach(f=>{xs.push(f.x);ys.push(f.y);}); arms.forEach(a=>{xs.push(a.pts.tip.x,a.pts.el.x);ys.push(a.pts.tip.y);});
+  [[BX0,BY0],[BX1,BY1]].forEach(([x,y])=>{const v=new THREE.Vector3(x,y,0).applyMatrix4(bm);xs.push(v.x);ys.push(v.y);});
+  const len=Math.round(Math.max(...xs)-Math.min(...xs)+2*FR), wid=Math.round(Math.max(...ys)-Math.min(...ys)+2*FR);
+  const setT=(id,t,c)=>{const e=$(id);e.textContent=t;e.className=c||'';};
+  setT('r_size',len+' × '+wid+' мм');
+  const belly=Math.min(...[[BX0,BY0],[BX1,BY0],[BX0,BY1],[BX1,BY1]].map(([x,y])=>new THREE.Vector3(x,y,BZ0).applyMatrix4(bm).z));
+  setT('r_clear',Math.round(belly)+' мм',belly<4?'bad':(belly<10?'warn':''));
+  setT('r_legs',legsOk===6?'все в пределах':(6-legsOk)+' вне пределов',legsOk===6?'ok':'bad');
+  setT('r_marg',Math.round(marg)+' мм',marg>8?'ok':(marg>0?'warn':'bad'));
+  if(belly<=0.5)setT('r_tq','лежит на брюхе — ноги без нагрузки','ok');
+  else setT('r_tq',tq.toFixed(3)+' Н·м · '+Math.round(tq/RATED*100)+'% ном.',tq<RATED*0.8?'ok':(tq<RATED?'warn':'bad'));
+  setT('r_arm',why.length?why[0]:'соблюдены',why.length?'bad':'ok');
+  setT('r_tip',Math.round(Math.min(...arms.map(a=>a.pts.tip.z)))+' мм');
+  setT('r_camtip',tipSeen.every(Boolean)?'обе':(tipSeen.some(Boolean)?'одну':'нет'),tipSeen.some(Boolean)?'ok':'warn');
+  setT('r_block',blockPct+' %'+(centre?' · центр закрыт':''),centre||blockPct>30?'bad':(blockPct>15?'warn':'ok'));
+  setT('r_camface',faceSeen?'да':'нет',faceSeen?'ok':'warn');
+  setT('r_edge','вперёд '+edgeTxt.f+' · назад '+edgeTxt.b+' · бок '+edgeTxt.s+(feetPast?' · стопа за краем!':''),edgeBad||feetPast?'bad':'');
+  $('coll').innerHTML=coll.length?'<b class="bad">Столкновения:</b><br>'+[...new Set(coll)].slice(0,8).join('<br>'):'<span class="ok">Столкновений нет</span>';
+  reach.visible=$('vReach').checked; camSegs.visible=$('vCam').checked;
+  edgeLines.forEach(l=>l.visible=$('vEdge').checked); edgeDots.forEach(l=>l.visible=$('vEdge').checked);
+  supLine.visible=comMark.visible=$('vSup').checked;
+  setTable(S.edge);
+}
+
+// ---------------- интерфейс ----------------
+const fmt={h:v=>(+v).toFixed(1)+' мм',st:v=>(+v).toFixed(1)+' мм',pitch:v=>v+'°',roll:v=>v+'°',qy:v=>v+'°',qp:v=>v+'°',qe:v=>v+'°',qg:v=>v+'°',qs:v=>v+'°',edge:v=>v+' мм'};
+function syncOut(){Object.keys(fmt).forEach(k=>{$('o_'+k).textContent=fmt[k]($(k).value);});}
+function clearPress(attr){document.querySelectorAll('['+attr+']').forEach(b=>b.setAttribute('aria-pressed','false'));}
+function showArm(){const t=S.arm[$('sideL').checked?'L':'R'];['qy','qp','qe','qg'].forEach((k,i)=>$(k).value=Math.round(t[i]));syncOut();}
+function readArm(){const t=['qy','qp','qe','qg'].map(k=>+$(k).value);
+  if($('sync').checked){S.arm.L=t.slice();S.arm.R=t.slice();}else S.arm[$('sideL').checked?'L':'R']=t;}
+['h','st','pitch','roll'].forEach(k=>$(k).addEventListener('input',()=>{S[k]=+$(k).value;if(k==='st')footW=footsWorld();clearPress('data-pose');syncOut();update();}));
+['qy','qp','qe','qg'].forEach(k=>$(k).addEventListener('input',()=>{readArm();clearPress('data-arm');syncOut();update();}));
+['qs','edge'].forEach(k=>$(k).addEventListener('input',()=>{S[k]=+$(k).value;syncOut();update();}));
+['vReach','vCam','vEdge','vSup','vTri','rule2','sync'].forEach(k=>$(k).addEventListener('change',update));
+['sideL','sideR'].forEach(k=>$(k).addEventListener('change',()=>{showArm();update();}));
+document.querySelectorAll('[data-pose]').forEach(b=>b.addEventListener('click',()=>{
+  Object.assign(S,POSES[b.dataset.pose]); ['h','st','pitch','roll'].forEach(k=>$(k).value=S[k]); footW=footsWorld();
+  clearPress('data-pose'); b.setAttribute('aria-pressed','true'); syncOut(); update();}));
+document.querySelectorAll('[data-arm]').forEach(b=>b.addEventListener('click',()=>{
+  const p=armPreset(b.dataset.arm); S.arm.L=p.L; S.arm.R=p.R;
+  if(b.dataset.arm==='wave'){$('sync').checked=false;$('sideL').checked=true;}
+  clearPress('data-arm'); b.setAttribute('aria-pressed','true'); showArm(); update();}));
+$('tog').addEventListener('click',()=>{const p=$('panel');p.classList.toggle('hidden');$('tog').setAttribute('aria-expanded',String(!p.classList.contains('hidden')));});
+
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+window.addEventListener('resize',resize); resize();
+syncOut(); update();
+window.__mini={S,update,arms,legs};
+(function loop(){ctl.update();renderer.render(scene,cam);requestAnimationFrame(loop);})();
+})();
+</script>
+</body>
+</html>

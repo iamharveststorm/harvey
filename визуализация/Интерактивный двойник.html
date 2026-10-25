@@ -18,6 +18,9 @@ body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:"Gol
 h1{font-family:"Unbounded","Golos Text",system-ui,sans-serif;font-weight:600;font-size:22px;margin:0 0 4px}
 .panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:310px;overflow-y:auto;padding:14px;border-radius:16px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .panel p.lead{margin:0 0 10px;color:var(--muted);line-height:1.4}
+.ver{display:flex;gap:6px;margin:0 0 8px}
+.ver a,.ver span{font-size:13px;padding:5px 10px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none}
+.ver span{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 fieldset{border:0;border-top:1px solid var(--line);margin:10px 0 0;padding:10px 0 0}
 legend{font-weight:600;padding:0 6px 0 0}
 label.s{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:8px 0 0;align-items:center}
@@ -49,6 +52,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 <div id="stage" aria-label="Трёхмерный двойник Харви"></div>
 <aside class="panel" id="panel">
   <h1>Двойник Харви</h1>
+  <nav class="ver" aria-label="Версия"><span aria-current="page">«Компакт»</span><a href="Двойник мини.html">«Компакт мини»</a></nav>
   <p class="lead">Компоновка v2: настоящие детали из CAD (клешни впереди, глаза на углах, хвост на колонне). Меняйте позу, клешни и хвост — справа сразу видно, хватает ли досягаемости, видит ли камера, где центр масс и что с чем сталкивается.</p>
   <fieldset><legend>Поза корпуса</legend>
     <div class="row"><button data-pose="work" aria-pressed="true">Рабочая стойка</button><button data-pose="rest">В покое</button><button data-pose="look">Смотрит на тебя</button></div>

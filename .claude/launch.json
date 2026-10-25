@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "visualization",
+      "runtimeExecutable": "C:\\venvs\\harvey-bench\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "визуализация"],
+      "port": 8765
+    }
+  ]
+}
