@@ -8,7 +8,9 @@
   "**/MUJOCO_LOG.TXT",
   "**/sim_results.txt",
   "**/requirements.txt",
-  "модели/чертежи/_проверка.txt"
+  "модели/чертежи/_проверка.txt",
+  ".claude/",
+  ".obsidian/"
  ],
  "gitignore": true
 }
