@@ -7,3 +7,6 @@ __pycache__/
 
 # Прошивка MicroPython для Pico 2 — скачивается заново с micropython.org
 *.uf2
+
+# graphify: служебный индекс кэша меняется после каждого коммита (хук) — не версионировать
+graphify-out/cache/stat-index.json
