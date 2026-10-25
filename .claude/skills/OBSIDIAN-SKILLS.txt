@@ -1,0 +1,2 @@
+Навыки Obsidian от Steph Ango (kepano/obsidian-skills), коммит 3ccff53 от 15.09.2026, лицензия MIT — OBSIDIAN-SKILLS-LICENSE.
+Обновить: скопировать skills/* из https://github.com/kepano/obsidian-skills поверх этих папок.
