@@ -1,0 +1,20 @@
+Id	Description	Qty	Unit	Designators
+1	Cable, 2 x 18 AWG	0.32	m	W2, W3, W4, W7, W8
+2	Cable, 2 x 20 AWG	0.06	m	W6
+3	Cable, 2 x 22 AWG	0.21	m	W10, W5, W9
+4	Cable, 3 x 18 AWG	0.05	m	W1
+5	Cable, 4 x 28 AWG	0.1	m	W13
+6	Cable, 8 x 28 AWG	0.1	m	W12
+7	Cable, USB 2.0, 4 x 28 AWG	0.1	m	W11
+8	Connector, BMS 2S, 10–15 А, с балансировкой, 5 pins	1		BMS
+9	Connector, DC-DC 5 В 3 А, Mini560 или аналог, 4 pins	1		DC5
+10	Connector, DC-DC 6,0 В, ≥ 6 А длительно, пик 8–10 А, ~17 × 23 мм, 4 pins	1		DC6
+11	Connector, RP2350-Zero, «спинной мозг»: шины, датчики края, IMU, заряд, 14 pins	1		RP
+12	Connector, Raspberry Pi Zero 2 W, «голова»: Wi-Fi, камера, глаза, звук, 6 pins	1		PI
+13	Connector, XT30, батарея съёмная, 2 pins	1		XT30
+14	Connector, Батарея 2S, 2 × 18650 (Molicel P28A / Samsung 30Q), 7,4 В, ~22 Вт·ч, 3 pins	1		BAT
+15	Connector, Выключатель, ≥ 10 А (мини-тумблеры на 3 А не годятся), 2 pins	1		SW
+16	Connector, Модуль заряда IP2326, вход 5 В → 2S, 15 Вт, 4 pins	1		CHG
+17	Connector, Пластины на брюхе, латунь 40 × 12 мм ← pogo станции 5 В 3 А, 2 pins	1		PADS
+18	Connector, Плата питания, F1 10 А · INA226 (шунт 10 мОм) · «звезда» GND · 1000 мкФ, 14 pins	1		PWR
+19	Connector, Плата шин, 3 × буфер полудуплекса (см. bus_buffer) · 1000 мкФ на 6 В, 10 pins	1		HUB

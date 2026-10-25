@@ -10,7 +10,9 @@
   "**/requirements.txt",
   "модели/чертежи/_проверка.txt",
   ".claude/",
-  ".obsidian/"
+  ".obsidian/",
+  "схемы/*.html",
+  "схемы/*.tsv"
  ],
  "gitignore": true
 }

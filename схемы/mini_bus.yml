@@ -1,0 +1,699 @@
+metadata:
+  title: Харви «Компакт мини» — шины приводов
+options:
+  fontname: Arial
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  color_mode: full
+  mini_bom_mode: false
+connectors:
+  HUB_A:
+    type: Плата шин — шина A
+    subtype: левые ноги, 9 приводов
+    pinlabels:
+    - A1 GND
+    - A1 +6 В
+    - A1 DATA
+    - A2 GND
+    - A2 +6 В
+    - A2 DATA
+    - A3 GND
+    - A3 +6 В
+    - A3 DATA
+    notes: питание к каждой конечности — своим проводом («звезда»);<br/>DATA — общая
+      для шины
+  HUB_B:
+    type: Плата шин — шина B
+    subtype: правые ноги, 9 приводов
+    pinlabels:
+    - B1 GND
+    - B1 +6 В
+    - B1 DATA
+    - B2 GND
+    - B2 +6 В
+    - B2 DATA
+    - B3 GND
+    - B3 +6 В
+    - B3 DATA
+    notes: питание к каждой конечности — своим проводом («звезда»);<br/>DATA — общая
+      для шины
+  HUB_C:
+    type: Плата шин — шина C
+    subtype: клешни и глаза, 10 приводов
+    pinlabels:
+    - C1 GND
+    - C1 +6 В
+    - C1 DATA
+    - C2 GND
+    - C2 +6 В
+    - C2 DATA
+    - C3 GND
+    - C3 +6 В
+    - C3 DATA
+    notes: питание к каждой конечности — своим проводом («звезда»);<br/>DATA — общая
+      для шины
+  LF1:
+    type: LF · поворот
+    subtype: STS3032-C036 · ID 11
+    pinlabels: &id001
+    - GND
+    - +6 В
+    - DATA
+  LF2:
+    type: LF · бедро
+    subtype: STS3032-C036 · ID 12
+    pinlabels: *id001
+  LF3:
+    type: LF · колено
+    subtype: STS3032-C036 · ID 13
+    pinlabels: *id001
+  LM1:
+    type: LM · поворот
+    subtype: STS3032-C036 · ID 21
+    pinlabels: *id001
+  LM2:
+    type: LM · бедро
+    subtype: STS3032-C036 · ID 22
+    pinlabels: *id001
+  LM3:
+    type: LM · колено
+    subtype: STS3032-C036 · ID 23
+    pinlabels: *id001
+  LB1:
+    type: LB · поворот
+    subtype: STS3032-C036 · ID 31
+    pinlabels: *id001
+  LB2:
+    type: LB · бедро
+    subtype: STS3032-C036 · ID 32
+    pinlabels: *id001
+  LB3:
+    type: LB · колено
+    subtype: STS3032-C036 · ID 33
+    pinlabels: *id001
+  RF1:
+    type: RF · поворот
+    subtype: STS3032-C036 · ID 41
+    pinlabels: *id001
+  RF2:
+    type: RF · бедро
+    subtype: STS3032-C036 · ID 42
+    pinlabels: *id001
+  RF3:
+    type: RF · колено
+    subtype: STS3032-C036 · ID 43
+    pinlabels: *id001
+  RM1:
+    type: RM · поворот
+    subtype: STS3032-C036 · ID 51
+    pinlabels: *id001
+  RM2:
+    type: RM · бедро
+    subtype: STS3032-C036 · ID 52
+    pinlabels: *id001
+  RM3:
+    type: RM · колено
+    subtype: STS3032-C036 · ID 53
+    pinlabels: *id001
+  RB1:
+    type: RB · поворот
+    subtype: STS3032-C036 · ID 61
+    pinlabels: *id001
+  RB2:
+    type: RB · бедро
+    subtype: STS3032-C036 · ID 62
+    pinlabels: *id001
+  RB3:
+    type: RB · колено
+    subtype: STS3032-C036 · ID 63
+    pinlabels: *id001
+  CL1:
+    type: CL · поворот плеча
+    subtype: STS3032-C036 · ID 71
+    pinlabels: *id001
+  CL2:
+    type: CL · подъём
+    subtype: STS3032-C036 · ID 72
+    pinlabels: *id001
+  CL3:
+    type: CL · локоть
+    subtype: STS3032-C036 · ID 73
+    pinlabels: *id001
+  CL4:
+    type: CL · захват
+    subtype: STS3032-C036 · ID 74
+    pinlabels: *id001
+  CR1:
+    type: CR · поворот плеча
+    subtype: STS3032-C036 · ID 81
+    pinlabels: *id001
+  CR2:
+    type: CR · подъём
+    subtype: STS3032-C036 · ID 82
+    pinlabels: *id001
+  CR3:
+    type: CR · локоть
+    subtype: STS3032-C036 · ID 83
+    pinlabels: *id001
+  CR4:
+    type: CR · захват
+    subtype: STS3032-C036 · ID 84
+    pinlabels: *id001
+  EY1:
+    type: EY · глаз левый
+    subtype: STS3032-C036 · ID 91
+    pinlabels: *id001
+  EY2:
+    type: EY · глаз правый
+    subtype: STS3032-C036 · ID 92
+    pinlabels: *id001
+cables:
+  W_LF1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.1
+    colors: &id002
+    - BK
+    - RD
+    - YE
+    notes: 'левая передняя нога: ток 3 приводов · ср. 0,1–0,6 А, пик 3,6 А'
+  W_LF2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_LF3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_LM1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.08
+    colors: *id002
+    notes: 'левая средняя нога: ток 3 приводов · ср. 0,1–0,6 А, пик 3,6 А'
+  W_LM2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_LM3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_LB1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.1
+    colors: *id002
+    notes: 'левая задняя нога: ток 3 приводов · ср. 0,1–0,6 А, пик 3,6 А'
+  W_LB2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_LB3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_RF1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.1
+    colors: *id002
+    notes: 'правая передняя нога: ток 3 приводов · ср. 0,1–0,6 А, пик 3,6 А'
+  W_RF2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_RF3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_RM1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.08
+    colors: *id002
+    notes: 'правая средняя нога: ток 3 приводов · ср. 0,1–0,6 А, пик 3,6 А'
+  W_RM2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_RM3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_RB1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.1
+    colors: *id002
+    notes: 'правая задняя нога: ток 3 приводов · ср. 0,1–0,6 А, пик 3,6 А'
+  W_RB2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_RB3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_CL1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.1
+    colors: *id002
+    notes: 'левая клешня: ток 4 приводов · ср. 0,1–0,3 А, пик 4,8 А'
+  W_CL2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 3 привода · пик 3,6 А
+  W_CL3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_CL4:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_CR1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.1
+    colors: *id002
+    notes: 'правая клешня: ток 4 приводов · ср. 0,1–0,3 А, пик 4,8 А'
+  W_CR2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 3 привода · пик 3,6 А
+  W_CR3:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 2 привода · пик 2,4 А
+  W_CR4:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+  W_EY1:
+    wirecount: 3
+    gauge: 22 AWG
+    length: 0.08
+    colors: *id002
+    notes: 'глаза: ток 2 приводов · ср. до 0,1 А, пик 2,4 А'
+  W_EY2:
+    wirecount: 3
+    gauge: 28 AWG
+    length: 0.15
+    colors: *id002
+    type: 1,25 мм, 3-pin (из комплекта привода)
+    notes: ток 1 привода · пик 1,2 А
+connections:
+- - HUB_A:
+    - 1
+    - 2
+    - 3
+  - W_LF1:
+    - 1
+    - 2
+    - 3
+  - LF1:
+    - 1
+    - 2
+    - 3
+- - LF1:
+    - 1
+    - 2
+    - 3
+  - W_LF2:
+    - 1
+    - 2
+    - 3
+  - LF2:
+    - 1
+    - 2
+    - 3
+- - LF2:
+    - 1
+    - 2
+    - 3
+  - W_LF3:
+    - 1
+    - 2
+    - 3
+  - LF3:
+    - 1
+    - 2
+    - 3
+- - HUB_A:
+    - 4
+    - 5
+    - 6
+  - W_LM1:
+    - 1
+    - 2
+    - 3
+  - LM1:
+    - 1
+    - 2
+    - 3
+- - LM1:
+    - 1
+    - 2
+    - 3
+  - W_LM2:
+    - 1
+    - 2
+    - 3
+  - LM2:
+    - 1
+    - 2
+    - 3
+- - LM2:
+    - 1
+    - 2
+    - 3
+  - W_LM3:
+    - 1
+    - 2
+    - 3
+  - LM3:
+    - 1
+    - 2
+    - 3
+- - HUB_A:
+    - 7
+    - 8
+    - 9
+  - W_LB1:
+    - 1
+    - 2
+    - 3
+  - LB1:
+    - 1
+    - 2
+    - 3
+- - LB1:
+    - 1
+    - 2
+    - 3
+  - W_LB2:
+    - 1
+    - 2
+    - 3
+  - LB2:
+    - 1
+    - 2
+    - 3
+- - LB2:
+    - 1
+    - 2
+    - 3
+  - W_LB3:
+    - 1
+    - 2
+    - 3
+  - LB3:
+    - 1
+    - 2
+    - 3
+- - HUB_B:
+    - 1
+    - 2
+    - 3
+  - W_RF1:
+    - 1
+    - 2
+    - 3
+  - RF1:
+    - 1
+    - 2
+    - 3
+- - RF1:
+    - 1
+    - 2
+    - 3
+  - W_RF2:
+    - 1
+    - 2
+    - 3
+  - RF2:
+    - 1
+    - 2
+    - 3
+- - RF2:
+    - 1
+    - 2
+    - 3
+  - W_RF3:
+    - 1
+    - 2
+    - 3
+  - RF3:
+    - 1
+    - 2
+    - 3
+- - HUB_B:
+    - 4
+    - 5
+    - 6
+  - W_RM1:
+    - 1
+    - 2
+    - 3
+  - RM1:
+    - 1
+    - 2
+    - 3
+- - RM1:
+    - 1
+    - 2
+    - 3
+  - W_RM2:
+    - 1
+    - 2
+    - 3
+  - RM2:
+    - 1
+    - 2
+    - 3
+- - RM2:
+    - 1
+    - 2
+    - 3
+  - W_RM3:
+    - 1
+    - 2
+    - 3
+  - RM3:
+    - 1
+    - 2
+    - 3
+- - HUB_B:
+    - 7
+    - 8
+    - 9
+  - W_RB1:
+    - 1
+    - 2
+    - 3
+  - RB1:
+    - 1
+    - 2
+    - 3
+- - RB1:
+    - 1
+    - 2
+    - 3
+  - W_RB2:
+    - 1
+    - 2
+    - 3
+  - RB2:
+    - 1
+    - 2
+    - 3
+- - RB2:
+    - 1
+    - 2
+    - 3
+  - W_RB3:
+    - 1
+    - 2
+    - 3
+  - RB3:
+    - 1
+    - 2
+    - 3
+- - HUB_C:
+    - 1
+    - 2
+    - 3
+  - W_CL1:
+    - 1
+    - 2
+    - 3
+  - CL1:
+    - 1
+    - 2
+    - 3
+- - CL1:
+    - 1
+    - 2
+    - 3
+  - W_CL2:
+    - 1
+    - 2
+    - 3
+  - CL2:
+    - 1
+    - 2
+    - 3
+- - CL2:
+    - 1
+    - 2
+    - 3
+  - W_CL3:
+    - 1
+    - 2
+    - 3
+  - CL3:
+    - 1
+    - 2
+    - 3
+- - CL3:
+    - 1
+    - 2
+    - 3
+  - W_CL4:
+    - 1
+    - 2
+    - 3
+  - CL4:
+    - 1
+    - 2
+    - 3
+- - HUB_C:
+    - 4
+    - 5
+    - 6
+  - W_CR1:
+    - 1
+    - 2
+    - 3
+  - CR1:
+    - 1
+    - 2
+    - 3
+- - CR1:
+    - 1
+    - 2
+    - 3
+  - W_CR2:
+    - 1
+    - 2
+    - 3
+  - CR2:
+    - 1
+    - 2
+    - 3
+- - CR2:
+    - 1
+    - 2
+    - 3
+  - W_CR3:
+    - 1
+    - 2
+    - 3
+  - CR3:
+    - 1
+    - 2
+    - 3
+- - CR3:
+    - 1
+    - 2
+    - 3
+  - W_CR4:
+    - 1
+    - 2
+    - 3
+  - CR4:
+    - 1
+    - 2
+    - 3
+- - HUB_C:
+    - 7
+    - 8
+    - 9
+  - W_EY1:
+    - 1
+    - 2
+    - 3
+  - EY1:
+    - 1
+    - 2
+    - 3
+- - EY1:
+    - 1
+    - 2
+    - 3
+  - W_EY2:
+    - 1
+    - 2
+    - 3
+  - EY2:
+    - 1
+    - 2
+    - 3

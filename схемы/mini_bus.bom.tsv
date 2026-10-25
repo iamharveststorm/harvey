@@ -1,0 +1,34 @@
+Id	Description	Qty	Unit	Designators
+1	Cable, 1,25 мм, 3-pin (из комплекта привода), 3 x 28 AWG	2.85	m	W_CL2, W_CL3, W_CL4, W_CR2, W_CR3, W_CR4, W_EY2, W_LB2, W_LB3, W_LF2, W_LF3, W_LM2, W_LM3, W_RB2, W_RB3, W_RF2, W_RF3, W_RM2, W_RM3
+2	Cable, 3 x 22 AWG	0.84	m	W_CL1, W_CR1, W_EY1, W_LB1, W_LF1, W_LM1, W_RB1, W_RF1, W_RM1
+3	Connector, CL · захват, STS3032-C036 · ID 74, 3 pins	1		CL4
+4	Connector, CL · локоть, STS3032-C036 · ID 73, 3 pins	1		CL3
+5	Connector, CL · поворот плеча, STS3032-C036 · ID 71, 3 pins	1		CL1
+6	Connector, CL · подъём, STS3032-C036 · ID 72, 3 pins	1		CL2
+7	Connector, CR · захват, STS3032-C036 · ID 84, 3 pins	1		CR4
+8	Connector, CR · локоть, STS3032-C036 · ID 83, 3 pins	1		CR3
+9	Connector, CR · поворот плеча, STS3032-C036 · ID 81, 3 pins	1		CR1
+10	Connector, CR · подъём, STS3032-C036 · ID 82, 3 pins	1		CR2
+11	Connector, EY · глаз левый, STS3032-C036 · ID 91, 3 pins	1		EY1
+12	Connector, EY · глаз правый, STS3032-C036 · ID 92, 3 pins	1		EY2
+13	Connector, LB · бедро, STS3032-C036 · ID 32, 3 pins	1		LB2
+14	Connector, LB · колено, STS3032-C036 · ID 33, 3 pins	1		LB3
+15	Connector, LB · поворот, STS3032-C036 · ID 31, 3 pins	1		LB1
+16	Connector, LF · бедро, STS3032-C036 · ID 12, 3 pins	1		LF2
+17	Connector, LF · колено, STS3032-C036 · ID 13, 3 pins	1		LF3
+18	Connector, LF · поворот, STS3032-C036 · ID 11, 3 pins	1		LF1
+19	Connector, LM · бедро, STS3032-C036 · ID 22, 3 pins	1		LM2
+20	Connector, LM · колено, STS3032-C036 · ID 23, 3 pins	1		LM3
+21	Connector, LM · поворот, STS3032-C036 · ID 21, 3 pins	1		LM1
+22	Connector, RB · бедро, STS3032-C036 · ID 62, 3 pins	1		RB2
+23	Connector, RB · колено, STS3032-C036 · ID 63, 3 pins	1		RB3
+24	Connector, RB · поворот, STS3032-C036 · ID 61, 3 pins	1		RB1
+25	Connector, RF · бедро, STS3032-C036 · ID 42, 3 pins	1		RF2
+26	Connector, RF · колено, STS3032-C036 · ID 43, 3 pins	1		RF3
+27	Connector, RF · поворот, STS3032-C036 · ID 41, 3 pins	1		RF1
+28	Connector, RM · бедро, STS3032-C036 · ID 52, 3 pins	1		RM2
+29	Connector, RM · колено, STS3032-C036 · ID 53, 3 pins	1		RM3
+30	Connector, RM · поворот, STS3032-C036 · ID 51, 3 pins	1		RM1
+31	Connector, Плата шин — шина A, левые ноги, 9 приводов, 9 pins	1		HUB_A
+32	Connector, Плата шин — шина B, правые ноги, 9 приводов, 9 pins	1		HUB_B
+33	Connector, Плата шин — шина C, клешни и глаза, 10 приводов, 9 pins	1		HUB_C

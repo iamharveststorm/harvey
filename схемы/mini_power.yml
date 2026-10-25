@@ -1,0 +1,401 @@
+metadata:
+  title: Харви «Компакт мини» — питание и логика
+options:
+  fontname: Arial
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  color_mode: full
+  mini_bom_mode: false
+connectors:
+  BAT:
+    type: Батарея 2S
+    subtype: 2 × 18650 (Molicel P28A / Samsung 30Q), 7,4 В, ~22 Вт·ч
+    pinlabels:
+    - B−
+    - BM (середина)
+    - B+
+  BMS:
+    type: BMS 2S, 10–15 А
+    subtype: с балансировкой
+    pinlabels:
+    - B−
+    - BM
+    - B+
+    - P−
+    - P+
+  XT30:
+    type: XT30
+    subtype: батарея съёмная
+    pinlabels:
+    - +
+    - −
+  PWR:
+    type: Плата питания
+    subtype: F1 10 А · INA226 (шунт 10 мОм) · «звезда» GND · 1000 мкФ
+    pinlabels:
+    - BAT+ (до F1)
+    - BAT−
+    - CHG+ (после F1, до SW)
+    - CHG−
+    - → SW
+    - SW →
+    - V6 IN+ (после шунта)
+    - V6 IN−
+    - V5 IN+ (после шунта)
+    - V5 IN−
+    - INA226 SDA
+    - INA226 SCL
+    - INA226 3V3
+    - INA226 GND
+    notes: 'Заряд — до выключателя: робот заряжается и выключенным.<br/>Шунт INA226
+      в «+» после выключателя: видит весь ток робота.'
+  SW:
+    type: Выключатель
+    subtype: ≥ 10 А (мини-тумблеры на 3 А не годятся)
+    pinlabels:
+    - '1'
+    - '2'
+  CHG:
+    type: Модуль заряда IP2326
+    subtype: вход 5 В → 2S, 15 Вт
+    pinlabels:
+    - VIN+
+    - VIN−
+    - BAT+
+    - BAT−
+  PADS:
+    type: Пластины на брюхе
+    subtype: латунь 40 × 12 мм ← pogo станции 5 В 3 А
+    pinlabels:
+    - +5 В
+    - GND
+  DC6:
+    type: DC-DC 6,0 В
+    subtype: ≥ 6 А длительно, пик 8–10 А, ~17 × 23 мм
+    pinlabels:
+    - IN+
+    - IN−
+    - OUT+ 6 В
+    - OUT−
+  DC5:
+    type: DC-DC 5 В 3 А
+    subtype: Mini560 или аналог
+    pinlabels:
+    - IN+
+    - IN−
+    - OUT+ 5 В
+    - OUT−
+  HUB:
+    type: Плата шин
+    subtype: 3 × буфер полудуплекса (см. bus_buffer) · 1000 мкФ на 6 В
+    pinlabels:
+    - +6 В
+    - GND сил.
+    - +3,3 В
+    - GND лог.
+    - TXD A
+    - RXD A
+    - TXD B
+    - RXD B
+    - TXD C
+    - RXD C
+    notes: Выходы A1–A3, B1–B3, C1–C3 — лист «Шины приводов»
+  PI:
+    type: Raspberry Pi Zero 2 W
+    subtype: '«голова»: Wi-Fi, камера, глаза, звук'
+    pinlabels:
+    - пин 2 · 5 В
+    - пин 6 · GND
+    - USB OTG VBUS
+    - USB OTG D−
+    - USB OTG D+
+    - USB OTG GND
+    notes: У входа 5 В — конденсатор 470 мкФ
+  RP:
+    type: RP2350-Zero
+    subtype: '«спинной мозг»: шины, датчики края, IMU, заряд'
+    pinlabels:
+    - USB VBUS
+    - USB D−
+    - USB D+
+    - USB GND
+    - 3V3 (выход)
+    - GND
+    - GP0 UART0 TX
+    - GP1 UART0 RX
+    - GP4 UART1 TX
+    - GP5 UART1 RX
+    - GP8 PIO TX
+    - GP9 PIO RX
+    - GP12 I2C0 SDA
+    - GP13 I2C0 SCL
+cables:
+  W1:
+    wirecount: 3
+    gauge: 18 AWG
+    length: 0.05
+    colors:
+    - BK
+    - WH
+    - RD
+    notes: Сборка батареи. BM — балансир, 26 AWG
+  W2:
+    wirecount: 2
+    gauge: 18 AWG
+    length: 0.05
+    colors:
+    - RD
+    - BK
+    notes: 7,4 В · ср. 1,5–2 А, пик ~10 А · защита BMS 15 А
+  W3:
+    wirecount: 2
+    gauge: 18 AWG
+    length: 0.08
+    colors:
+    - RD
+    - BK
+    notes: 7,4 В · весь ток робота
+  W4:
+    wirecount: 2
+    gauge: 18 AWG
+    length: 0.06
+    colors:
+    - RD
+    - RD
+    notes: через выключатель — весь ток робота, пик ~10 А
+  W5:
+    wirecount: 2
+    gauge: 22 AWG
+    length: 0.08
+    colors:
+    - RD
+    - BK
+    notes: заряд 2S · до 1,8 А (15 Вт)
+  W6:
+    wirecount: 2
+    gauge: 20 AWG
+    length: 0.06
+    colors:
+    - RD
+    - BK
+    notes: 5 В со станции · до 3 А (pogo — минимум 2 на полюс!)
+  W7:
+    wirecount: 2
+    gauge: 18 AWG
+    length: 0.05
+    colors:
+    - RD
+    - BK
+    notes: 7,4 В → 6 В · ср. 1–1,5 А, пик ~9 А
+  W8:
+    wirecount: 2
+    gauge: 18 AWG
+    length: 0.08
+    colors:
+    - RD
+    - BK
+    notes: '6 В на все 28 приводов · ход: ср. 1–2 А, пик 8–10 А'
+  W9:
+    wirecount: 2
+    gauge: 22 AWG
+    length: 0.05
+    colors:
+    - RD
+    - BK
+    notes: 7,4 В → 5 В · ≤ 1,2 А
+  W10:
+    wirecount: 2
+    gauge: 22 AWG
+    length: 0.08
+    colors:
+    - RD
+    - BK
+    notes: '5 В: Pi Zero 2 W + камера + дисплеи + звук · 0,5–1,5 А'
+  W11:
+    wirecount: 4
+    gauge: 28 AWG
+    length: 0.1
+    colors:
+    - RD
+    - WH
+    - GN
+    - BK
+    notes: 'USB micro-B ↔ USB-C: питание RP2350 + связь Pi ↔ RP2350 (USB CDC)'
+    type: USB 2.0
+  W12:
+    wirecount: 8
+    gauge: 28 AWG
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - YE
+    - GN
+    - BU
+    - VT
+    - WH
+    - GY
+    notes: логика 3,3 В · шины A, B, C по 1 Мбит/с
+  W13:
+    wirecount: 4
+    gauge: 28 AWG
+    length: 0.1
+    colors:
+    - OG
+    - BK
+    - BU
+    - YE
+    notes: I2C 400 кГц · на этой же шине BMI270 и 6 × VL53L4CD
+connections:
+- - BAT:
+    - 1
+    - 2
+    - 3
+  - W1:
+    - 1
+    - 2
+    - 3
+  - BMS:
+    - 1
+    - 2
+    - 3
+- - BMS:
+    - 5
+    - 4
+  - W2:
+    - 1
+    - 2
+  - XT30:
+    - 1
+    - 2
+- - XT30:
+    - 1
+    - 2
+  - W3:
+    - 1
+    - 2
+  - PWR:
+    - 1
+    - 2
+- - PWR:
+    - 5
+    - 6
+  - W4:
+    - 1
+    - 2
+  - SW:
+    - 1
+    - 2
+- - PADS:
+    - 1
+    - 2
+  - W6:
+    - 1
+    - 2
+  - CHG:
+    - 1
+    - 2
+- - CHG:
+    - 3
+    - 4
+  - W5:
+    - 1
+    - 2
+  - PWR:
+    - 3
+    - 4
+- - PWR:
+    - 7
+    - 8
+  - W7:
+    - 1
+    - 2
+  - DC6:
+    - 1
+    - 2
+- - DC6:
+    - 3
+    - 4
+  - W8:
+    - 1
+    - 2
+  - HUB:
+    - 1
+    - 2
+- - PWR:
+    - 9
+    - 10
+  - W9:
+    - 1
+    - 2
+  - DC5:
+    - 1
+    - 2
+- - DC5:
+    - 3
+    - 4
+  - W10:
+    - 1
+    - 2
+  - PI:
+    - 1
+    - 2
+- - PI:
+    - 3
+    - 4
+    - 5
+    - 6
+  - W11:
+    - 1
+    - 2
+    - 3
+    - 4
+  - RP:
+    - 1
+    - 2
+    - 3
+    - 4
+- - RP:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+  - W12:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+  - HUB:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+- - RP:
+    - 5
+    - 6
+    - 13
+    - 14
+  - W13:
+    - 1
+    - 2
+    - 3
+    - 4
+  - PWR:
+    - 13
+    - 14
+    - 11
+    - 12
