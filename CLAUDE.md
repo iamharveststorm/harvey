@@ -35,7 +35,7 @@ DIY-робот-краб для рабочего стола: компаньон �
 ## Качество кода (ub-mode + superpowers)
 - Любую правку кода (стенд, прошивка, симуляция, генераторы схем) делать по `.claude/skills/ub-mode/SKILL.md`: сначала тест, который падает, потом минимальная правка, потом чистка. Заметок и документов это не касается.
 - Плагин superpowers (включён для проекта в `.claude/settings.json`): новая функция — `brainstorming` → `writing-plans` → `test-driven-development`; ошибка — `systematic-debugging`; перед словом «готово» — `verification-before-completion`.
-- Инструменты ub-mode — `C:\venvs\harvey-quality` (исходники `C:\tools\unclebob`): `crapper` (CRAP < 10), `dryer` (дубли ≥ 0,8), `mutator` (мутанты). Запуск из папки модуля, например в `код/стенд привода`: `check_quality.bat` или `crapper --threshold 10 harvey_bench`. Отчёты — в `.metrics/` (не в git).
+- Инструменты ub-mode — `C:\venvs\harvey-quality` (исходники `C:\tools\unclebob`): `crapper` (CRAP < 10), `dryer` (дубли ≥ 0,8), `mutator` (мутанты). Для стенда — `код/стенд привода/check_quality.bat` (тесты под coverage в окружении стенда → crapper → dryer; `check_quality.bat mutate sts` — ещё мутанты). Сам `crapper` без готового покрытия на Windows даёт 0 %: он зовёт заглушку `python3` из Microsoft Store. Отчёты — в `.metrics/` (не в git).
 - MicroPython-код Pico (`код/прошивка/pico/`) проверяется на ПК через `pc_check.py`; железо — только на стенде.
 
 ## Правила работы

@@ -2,3 +2,4 @@ ub-mode — скил Роберта Мартина (Uncle Bob): принципы
 Источник: https://github.com/unclebob/ub-mode, коммит 57a8bdd (2026-10-25). SKILL.md скопирован без изменений.
 Обновить: скачать SKILL.md заново и заменить этот файл.
 Инструменты: crapper, dryer, mutator — https://github.com/unclebob (0BSD), установлены в C:/venvs/harvey-quality.
+Локальная правка mutator (C:/tools/unclebob/mutator/src/mutator/runner.py, _kill_tree): на Windows нет os.killpg, зависший мутант останавливается через taskkill /T /F. При обновлении mutator проверить, исправлено ли у автора, иначе повторить.
