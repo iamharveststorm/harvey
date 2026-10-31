@@ -18,5 +18,5 @@ graphify-out/*.sig
 
 # ub-mode: отчёты crapper / dryer / mutator — пересчитываются, не версионировать
 .metrics/
-target/coverage/
-target/mutation-workers/
+**/target/coverage/
+**/target/mutation-workers/
