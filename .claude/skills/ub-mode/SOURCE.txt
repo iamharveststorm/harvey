@@ -1,4 +1,4 @@
 ub-mode — скил Роберта Мартина (Uncle Bob): принципы «сначала заработай, потом сделай правильно».
 Источник: https://github.com/unclebob/ub-mode, коммит 57a8bdd (2026-10-25). SKILL.md скопирован без изменений.
 Обновить: скачать SKILL.md заново и заменить этот файл.
-Инструменты: crapper, dryer, mutator — https://github.com/unclebob (0BSD), установлены в C:envs\harvey-quality.
+Инструменты: crapper, dryer, mutator — https://github.com/unclebob (0BSD), установлены в C:/venvs/harvey-quality.
