@@ -119,6 +119,17 @@ def clamp(j: str, deg: float) -> float:
     return max(lo, min(hi, deg))
 
 
+def step_pose(ph: float, sweep: float, down: tuple[float, float], up: tuple[float, float]) -> tuple[float, float, float]:
+    """Поза шага на месте в фазе ph (0…1): первая половина — опора (стопа на столе с нажимом, поворот +sweep → −sweep),
+    вторая — перенос (подъём по синусу до up и обратно, поворот −sweep → +sweep). Углы в градусах."""
+    if ph < 0.5:
+        return sweep * (1 - 4 * ph), down[0], down[1]
+    k = math.sin(math.pi * (ph - 0.5) * 2)
+    return (-sweep + 4 * sweep * (ph - 0.5),
+            down[0] + (up[0] - down[0]) * k,
+            down[1] + (up[1] - down[1]) * k)
+
+
 class Leg:
     """Нога поверх стенда (Bench): позы, чтение углов, тесты."""
 
@@ -399,16 +410,7 @@ class Leg:
                 el = self.b.clock() - t0
                 if el >= minutes * 60:
                     break
-                ph = (el % period) / period
-                if ph < 0.5:                                       # опора: стопа на столе с нажимом
-                    qc = sweep * (1 - 4 * ph)                       # +sweep → −sweep
-                    qf, qk = down
-                else:                                              # перенос: подъём и обратно
-                    k = math.sin(math.pi * (ph - 0.5) * 2)
-                    qc = -sweep + 2 * sweep * (ph - 0.5) * 2
-                    qf = down[0] + (up[0] - down[0]) * k
-                    qk = down[1] + (up[1] - down[1]) * k
-                self.stream(qc, qf, qk)
+                self.stream(*step_pose((el % period) / period, sweep, down, up))
                 if el - last_log >= 2.0:
                     last_log = el
                     st = {j: s.state() for j, s in sv.items()}
