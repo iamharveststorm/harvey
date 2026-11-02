@@ -1,0 +1,28 @@
+"""Харви «Компакт мини» — голова на Pi Zero 2 W: выводы и настройки.
+
+ПРЕДВАРИТЕЛЬНО: выводы — из схемы (схемы/README.md, «Выводы Pi Zero 2 W»), проверить на стенде до пайки.
+Номера GPIO — нумерация BCM (как в gpiozero), в скобках — пин гребёнки.
+"""
+
+# Глаза: 2 × GC9D01 160 × 160 на SPI0 (документы/GC9D01N — даташит Galaxycore.pdf)
+SPI_BUS = 0
+EYE_CE = {"left": 0, "right": 1}             # CE0 (24) — левый глаз, CE1 (26) — правый
+EYE_DC, EYE_RST, EYE_BL = 25, 24, 12         # DC (22), RST (18) — общие; подсветка — PWM0 (32)
+SPI_HZ = 32_000_000                          # такт записи GC9D01 ≥ 10 нс (≤ 100 МГц); провода через стебелёк — 32 МГц
+EYE_SIZE = 160
+EYE_MADCTL = {"left": 0x08, "right": 0x08}   # BGR; поворот подобрать на стенде по тому, как дисплей стоит в глазу
+
+# Сенсорные кнопки TTP223 на крышке: спереди назад (пины 29, 31, 36, 11)
+TOUCH_PADS = (5, 6, 16, 17)
+
+# Звук I2S: 2 × INMP441 + MAX98357A; SD усилителя — GPIO26 (37): 0 — тишина
+AMP_SD = 26
+ALSA_DEVICE = "default"
+
+# Связь
+SPINE_PORT = "/dev/ttyACM0"                  # RP2350-Zero по USB
+SPINE_BAUD = 115200                          # для USB CDC скорость не важна
+BRAIN_HOST, BRAIN_PORT = "harvey-brain.local", 8765
+TELEMETRY_TO_BRAIN_HZ = 5
+
+FPS = 30
