@@ -358,3 +358,42 @@ def test_save_writes_excel_and_json(big):
     assert path.exists()
     d = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
     assert d["servo"] == "sts3215" and d["results"][0]["verdict"] == "ОК" and d["log"] == big.log_rows
+
+
+# ---------- нормы нагрева (чистые функции) ----------
+@pytest.mark.parametrize("temp, amps, over_since, now, expected", [
+    (69, 1.0, None, 100.0, ("", None)),                                   # всё в норме
+    (70, 1.0, None, 100.0, ("остановлен: 70 °C", None)),                  # датчик дошёл до 70 °C
+    (40, 2.3, None, 100.0, ("", 100.0)),                                  # перегрузка началась — засекаем
+    (40, 2.3, 100.0, 105.0, ("", 100.0)),                                 # ровно 5 с — ещё можно
+    (40, 2.3, 100.0, 105.1, ("остановлен: ток > 2,2 А дольше 5 с", 100.0)),
+    (40, 2.2, 100.0, 110.0, ("", None)),                                  # ток вернулся к 2,2 А — отсчёт сброшен
+])
+def test_heat_abort_by_temperature_and_long_overcurrent(temp, amps, over_since, now, expected):
+    from harvey_bench.bench import heat_abort
+
+    assert heat_abort(temp, amps, over_since, now) == expected
+
+
+@pytest.mark.parametrize("peak, mean_i, case, aborted, ok", [
+    (70, 1.1, 65, "", True), (71, 1.0, 50, "", False), (60, 1.11, 50, "", False), (60, 1.0, 66, "", False),
+    (60, 1.0, None, "", True), (60, 1.0, 50, "остановлен", False)])
+def test_heat_ok_norms(peak, mean_i, case, aborted, ok):
+    from harvey_bench.bench import heat_ok
+
+    assert heat_ok(peak, mean_i, case, aborted) is ok
+
+
+def test_heat_holds_the_weight_with_torque_on(big):
+    held = []
+    sleep = big.sleep
+    big.sleep = lambda sec: (held.append(big.bus.servos[1].mem[sts.TORQUE_ENABLE[0]]), sleep(sec))
+    big.heat_test(1, minutes=0.1)
+    assert held and all(held) and released(big)                      # всё время замера — с моментом, в конце отпущен
+
+
+def test_heat_case_default_is_sensor_minus_three(big):
+    big.heat_test(1, minutes=0.1)
+    measured = result(big, "7")["measured"]
+    sensor = int(measured.split("датчик ")[1].split()[0])
+    assert f"корпус {float(sensor - 3)} °C" in measured

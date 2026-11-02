@@ -30,6 +30,22 @@ CALIB_FILE = Path("bench_calibration.json")
 STEP_DEG = sts.DEG_PER_STEP
 
 
+def heat_abort(temp: int, amps: float, over_since: float | None, now: float) -> tuple[str, float | None]:
+    """Остановить нагрев? Датчик дошёл до 70 °C или ток больше 2,2 А держится дольше 5 с.
+    Возвращает (причина или пусто, с какого момента ток выше 2,2 А — None, если не выше)."""
+    if temp >= 70:
+        return "остановлен: 70 °C", over_since
+    if amps <= 2.2:
+        return "", None
+    over_since = over_since or now
+    return ("остановлен: ток > 2,2 А дольше 5 с" if now - over_since > 5 else ""), over_since
+
+
+def heat_ok(peak_t: int, mean_i: float, case_t: float | None, aborted: str) -> bool:
+    """Норма нагрева на номинале: датчик ≤ 70 °C, средний ток ≤ 1,1 А, корпус по термопаре (если мерили) ≤ 65 °C."""
+    return peak_t <= 70 and mean_i <= 1.1 and (case_t is None or case_t <= 65) and not aborted
+
+
 class Bench:
     def __init__(self, bus, auto: bool = False, speedup: float = 1.0, clock=time.monotonic,
                  profile: sts.Profile = sts.PROFILES["sts3215"]):
@@ -336,42 +352,42 @@ class Bench:
         self.wait_enter("  Рычаг горизонтально, груз подвешен в отверстие 100 мм, термопара приклеена к корпусу.")
         if not self.precheck(s):
             return
-        if isinstance(getattr(self.bus, "servos", None), dict):
-            self.bus.servos[sid].ext_load_frac = 0.33
+        self._sim_load(sid, 0.33)                                   # имитация: груз 1 кг на 100 мм
         start = s.pos()
         s.set_torque_limit(100)
         s.move(start)
         s.torque(True)
-        t0, peak_t, over_since, currents, aborted = self.clock(), 0, None, [], ""
         try:
-            while self.clock() - t0 < minutes * 60:
-                st = s.state()
-                el = self.clock() - t0
-                self.log_rows.append([round(el, 1), st.temp, round(st.current_a, 3), st.volt, st.pos])
-                currents.append(st.current_a)
-                peak_t = max(peak_t, st.temp)
-                print(f"\r  {el / 60:4.1f} мин: {st.temp} °C, {st.current_a:.2f} А, {st.volt:.1f} В   ", end="", flush=True)
-                if st.temp >= 70:
-                    aborted = "остановлен: 70 °C"
-                    break
-                if st.current_a > 2.2:
-                    over_since = over_since or self.clock()
-                    if self.clock() - over_since > 5:
-                        aborted = "остановлен: ток > 2,2 А дольше 5 с"
-                        break
-                else:
-                    over_since = None
-                self.sleep(2.0)
+            peak_t, currents, aborted = self._heat_run(s, minutes * 60)
         finally:
             s.torque(False)
-            if isinstance(getattr(self.bus, "servos", None), dict):
-                self.bus.servos[sid].ext_load_frac = 0.0
+            self._sim_load(sid, 0.0)
             print()
         mean_i = statistics.mean(currents) if currents else 0.0
         case_t = self.ask_float("  Температура корпуса по термопаре в конце, °C («-» — не мерил)", float(peak_t - 3))
-        ok = peak_t <= 70 and mean_i <= 1.1 and (case_t is None or case_t <= 65) and not aborted
         meas = f"датчик {peak_t} °C, корпус {case_t if case_t is not None else '—'} °C, ток {mean_i:.2f} А"
-        self.add("7", f"Нагрев на номинале, {minutes:.0f} мин", meas, "корпус ≤ 65 °C, датчик ≤ 70 °C, ток ≤ 1,1 А", ok, aborted)
+        self.add("7", f"Нагрев на номинале, {minutes:.0f} мин", meas, "корпус ≤ 65 °C, датчик ≤ 70 °C, ток ≤ 1,1 А",
+                 heat_ok(peak_t, mean_i, case_t, aborted), aborted)
+
+    def _heat_run(self, s: sts.Servo, seconds: float) -> tuple[int, list, str]:
+        """Держать груз seconds секунд, раз в 2 с — строка журнала. Остановиться по heat_abort."""
+        t0, peak_t, over_since, currents = self.clock(), 0, None, []
+        while (el := self.clock() - t0) < seconds:
+            st = s.state()
+            self.log_rows.append([round(el, 1), st.temp, round(st.current_a, 3), st.volt, st.pos])
+            currents.append(st.current_a)
+            peak_t = max(peak_t, st.temp)
+            print(f"\r  {el / 60:4.1f} мин: {st.temp} °C, {st.current_a:.2f} А, {st.volt:.1f} В   ", end="", flush=True)
+            aborted, over_since = heat_abort(st.temp, st.current_a, over_since, self.clock())
+            if aborted:
+                return peak_t, currents, aborted
+            self.sleep(2.0)
+        return peak_t, currents, ""
+
+    def _sim_load(self, sid: int, frac: float) -> None:
+        """Только для имитации (--sim): постоянная нагрузка на привод, доля от упора. На настоящей шине ничего не делает."""
+        if isinstance(getattr(self.bus, "servos", None), dict):
+            self.bus.servos[sid].ext_load_frac = frac
 
     # ---------- отчёт ----------
     def save(self) -> Path:
