@@ -102,12 +102,12 @@ def build_xml(pen=False, napkin=False, world_xml=None, visual=True, dock=False, 
       <body name="{s}_ay" pos="{x} {y} {z}">
         <joint name="{s}_y" axis="0 0 {sg}" range="-10 70" armature="0.0015" damping="0.01"/>
         <geom type="cylinder" size="0.008 0.002" pos="0 0 -0.009" mass="{max(0.001, MS['ay'] - 0.02):.4f}" group="1" contype="0" conaffinity="0"/>
+        <geom type="box" size="0.0115 0.0138 0.006" pos="-0.0058 0 0" mass="0.020" group="1" contype="0" conaffinity="0"/>
         {vis(f"{s}_ay")}
         <body name="{s}_up">
           <joint name="{s}_p" axis="0 -1 0" range="-20 90" armature="0.0015" damping="0.01"/>
-          <geom type="box" size="0.0115 0.0138 0.006" pos="-0.0058 0 0" mass="0.020" group="1" contype="0" conaffinity="0"/>
           <geom name="{s}_upg" type="capsule" fromto="0.008 {sg * 0.020} 0 {A1} {sg * 0.020} 0" size="0.005" mass="{max(0.001, MS['up'] - 0.02):.4f}" group="1" rgba=".9 .4 .2 1"/>
-          <geom type="box" size="0.0115 0.0138 0.006" pos="{A1 - 0.0058} 0 0" mass="0.0001" group="1" rgba=".1 .1 .1 1"/>
+          <geom type="box" size="0.0115 0.0138 0.006" pos="{A1 - 0.0058} 0 0" mass="0.020" group="1" rgba=".1 .1 .1 1"/>
           {vis(f"{s}_up")}
           <body name="{s}_fore" pos="{A1} 0 0">
             <joint name="{s}_e" axis="0 -1 0" range="-140 60" armature="0.0015" damping="0.01"/>
@@ -337,11 +337,17 @@ def test_walk(vx=0.06, sec=8.0):
             "поворот_ноги": s.load(LEGS_C)}
 
 
-def test_turn():
+def test_turn(wz=0.8, sec=4.0):
+    """Поворот на месте. Угол копится по шагам: за 4 с при 45 °/с корпус проходит 180°, и разность конечного и
+    начального курса (atan2) перескакивает через ±180° — раньше отсюда был неверный знак."""
     s = Mini(); s.run(0.5, record=False)
     yaw = lambda q: math.degrees(math.atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] ** 2 + q[3] ** 2)))
-    y0 = yaw(s.d.body("torso").xquat); s.run(4.0, s.gait(0.0, wz=0.8))
-    return {"градусов_в_с": round((yaw(s.d.body("torso").xquat) - y0) / 4, 1), "на_ногах": bool(s.tilt() < 30)}
+    fn = s.gait(0.0, wz=wz); prev = yaw(s.d.body("torso").xquat); total = 0.0
+    for i in range(int(sec / DT)):
+        fn(i * DT); s.step(False)
+        if i % 100 == 0:
+            y = yaw(s.d.body("torso").xquat); total += (y - prev + 180) % 360 - 180; prev = y
+    return {"градусов_в_с": round(total / sec, 1), "на_ногах": bool(s.tilt() < 30)}
 
 
 def test_pen():

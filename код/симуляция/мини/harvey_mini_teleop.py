@@ -138,36 +138,68 @@ class MiniTeleop:
     def key(self, k, hold=False):
         k = k.upper() if isinstance(k, str) else k
         if k in self.MOVE:
-            if self.macro: self.macro = None; self.msg = "действие прервано"
-            if self.pose == "лежит": self.dz_t = 0.0; self.pose = "стоит"
-            self.held.add(k); self.cmd = self._cmd_from(); self.msg = "иду"; return
-        if k in self.CLAW:
-            self.claw_held.add(k); return
-        if k in ("[", "]"):                                     # посмотреть вниз / вверх — наклонить корпус ногами (камера в корпусе)
-            self.pitch_t = float(np.clip(self.pitch_t + math.radians(4 if k == "[" else -4), math.radians(-12), math.radians(12)))
-            self.msg = f"наклон корпуса {math.degrees(self.pitch_t):+.0f}° ({'вниз' if self.pitch_t > 0 else 'вверх' if self.pitch_t < 0 else 'ровно'})"; return
-        if k in (",", "."):                                     # сила сжатия: ограничение момента привода захвата
-            self.sim.grip_lim = float(np.clip(self.sim.grip_lim + (0.01 if k == "." else -0.01), 0.01, 0.20))
-            self.msg = f"сила захвата: предел {self.sim.grip_lim:.2f} Н·м (≈ {self.sim.grip_lim / 0.015:.1f} Н на середине губок)"; return
-        if k == " ": self.held.clear(); self.cmd[:] = 0; self.macro = None; self.msg = "стоп"
-        elif k == "F": self.fast = not self.fast; self.cmd = self._cmd_from(); self.msg = "быстрый шаг" if self.fast else "обычный шаг"
-        elif k == "R":
-            self.dz_t = 0.016 if self.dz_t < 0.010 else 0.0; self.pose = "присел" if self.dz_t else "стоит"; self.msg = self.pose
-        elif k == "Z":
-            self.dz_t = 0.013 if self.pose != "лежит" else 0.0; self.pose = "лежит" if self.dz_t else "стоит"; self.msg = self.pose
-        elif k == "B":
-            self.claw_sel = {"LR": "L", "L": "R", "R": "LR"}[self.claw_sel]
-            self.msg = "клешня: " + {"L": "левая", "R": "правая", "LR": "обе"}[self.claw_sel]
-        elif k in "1234":
-            self.preset(int(k))
-        elif k == "T": self.macro = self._macro_pick(); self.msg = "беру…"
-        elif k == "H": self.macro = self._macro_dock(); self.msg = "иду на станцию"
-        elif k in "789":
-            self.eyes = {"7": {"L": -35.0, "R": -35.0}, "8": {"L": 18.0, "R": -12.0}, "9": {"L": 12.0, "R": 12.0}}[k]
-            self.msg = {"7": "грустит", "8": "интересно", "9": "радуется"}[k]
-        elif k == "G": self.guard = not self.guard; self.msg = "защита края " + ("вкл" if self.guard else "выкл")
-        elif k == "C": self.show_phys = not self.show_phys
-        elif k == "0": self.soft_reset(); self.msg = "заново"
+            self._walk_key(k)
+        elif k in self.CLAW:
+            self.claw_held.add(k)
+        elif k in self.KEYS:
+            getattr(self, self.KEYS[k])(k)
+
+    KEYS = {"[": "_pitch_key", "]": "_pitch_key", ",": "_grip_key", ".": "_grip_key", " ": "_stop_key", "F": "_fast_key",
+            "R": "_crouch_key", "Z": "_lie_key", "B": "_claw_key", "1": "_preset_key", "2": "_preset_key", "3": "_preset_key",
+            "4": "_preset_key", "T": "_pick_key", "H": "_home_key", "7": "_eyes_key", "8": "_eyes_key", "9": "_eyes_key",
+            "G": "_guard_key", "C": "_phys_key", "0": "_reset_key"}
+    EYES = {"7": ({"L": -35.0, "R": -35.0}, "грустит"), "8": ({"L": 18.0, "R": -12.0}, "интересно"),
+            "9": ({"L": 12.0, "R": 12.0}, "радуется")}
+
+    def _walk_key(self, k):
+        if self.macro: self.macro = None; self.msg = "действие прервано"
+        if self.pose == "лежит": self.dz_t = 0.0; self.pose = "стоит"
+        self.held.add(k); self.cmd = self._cmd_from(); self.msg = "иду"
+
+    def _pitch_key(self, k):                                    # посмотреть вниз / вверх — наклонить корпус ногами (камера в корпусе)
+        self.pitch_t = float(np.clip(self.pitch_t + math.radians(4 if k == "[" else -4), math.radians(-12), math.radians(12)))
+        self.msg = f"наклон корпуса {math.degrees(self.pitch_t):+.0f}° ({'вниз' if self.pitch_t > 0 else 'вверх' if self.pitch_t < 0 else 'ровно'})"
+
+    def _grip_key(self, k):                                     # сила сжатия: ограничение момента привода захвата
+        self.sim.grip_lim = float(np.clip(self.sim.grip_lim + (0.01 if k == "." else -0.01), 0.01, 0.20))
+        self.msg = f"сила захвата: предел {self.sim.grip_lim:.2f} Н·м (≈ {self.sim.grip_lim / 0.015:.1f} Н на середине губок)"
+
+    def _stop_key(self, k):
+        self.held.clear(); self.cmd[:] = 0; self.macro = None; self.msg = "стоп"
+
+    def _fast_key(self, k):
+        self.fast = not self.fast; self.cmd = self._cmd_from(); self.msg = "быстрый шаг" if self.fast else "обычный шаг"
+
+    def _crouch_key(self, k):
+        self.dz_t = 0.016 if self.dz_t < 0.010 else 0.0; self.pose = "присел" if self.dz_t else "стоит"; self.msg = self.pose
+
+    def _lie_key(self, k):
+        self.dz_t = 0.013 if self.pose != "лежит" else 0.0; self.pose = "лежит" if self.dz_t else "стоит"; self.msg = self.pose
+
+    def _claw_key(self, k):
+        self.claw_sel = {"LR": "L", "L": "R", "R": "LR"}[self.claw_sel]
+        self.msg = "клешня: " + {"L": "левая", "R": "правая", "LR": "обе"}[self.claw_sel]
+
+    def _preset_key(self, k):
+        self.preset(int(k))
+
+    def _pick_key(self, k):
+        self.macro = self._macro_pick(); self.msg = "беру…"
+
+    def _home_key(self, k):
+        self.macro = self._macro_dock(); self.msg = "иду на станцию"
+
+    def _eyes_key(self, k):
+        self.eyes, self.msg = dict(self.EYES[k][0]), self.EYES[k][1]
+
+    def _guard_key(self, k):
+        self.guard = not self.guard; self.msg = "защита края " + ("вкл" if self.guard else "выкл")
+
+    def _phys_key(self, k):
+        self.show_phys = not self.show_phys
+
+    def _reset_key(self, k):
+        self.soft_reset(); self.msg = "заново"
 
     def release(self, k):
         k = k.upper()

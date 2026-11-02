@@ -26,24 +26,24 @@ WOOD = 'friction="0.40 0.005 0.0006" condim="6" priority="1" solref="0.004 1"'
 RUBBER = 'friction="0.70 0.005 0.0008" condim="6" priority="1" solref="0.004 1"'
 
 
-def _hex_mesh(name, x0, x1, af):
-    """Шестигранная призма вдоль x, af — размер под ключ; вершины по бокам, грани сверху и снизу (лежит на грани)."""
-    R = af / 2 / math.cos(math.radians(30))
-    pts = []
-    for x in (x0, x1):
-        for k in range(6):
-            a = math.radians(60 * k)
-            pts.append((x, R * math.cos(a), R * math.sin(a)))
+def _hex_ring(x, r):
+    """6 вершин шестигранника радиусом r (до вершины) в плоскости x; вершины по бокам, грани сверху и снизу."""
+    return [(x, r * math.cos(math.radians(60 * k)), r * math.sin(math.radians(60 * k))) for k in range(6)]
+
+
+def _mesh(name, pts):
     return f'<mesh name="{name}" vertex="{" ".join(f"{v:.5f}" for p in pts for v in p)}"/>'
+
+
+def _hex_mesh(name, x0, x1, af):
+    """Шестигранная призма вдоль x, af — размер под ключ (лежит на грани)."""
+    R = af / 2 / math.cos(math.radians(30))
+    return _mesh(name, _hex_ring(x0, R) + _hex_ring(x1, R))
 
 
 def _hex_tip_mesh(name, x0, x1, af, r_tip):
-    R = af / 2 / math.cos(math.radians(30)); pts = []
-    for k in range(6):
-        a = math.radians(60 * k); pts.append((x0, R * math.cos(a), R * math.sin(a)))
-    for k in range(6):
-        a = math.radians(60 * k); pts.append((x1, r_tip * math.cos(a), r_tip * math.sin(a)))
-    return f'<mesh name="{name}" vertex="{" ".join(f"{v:.5f}" for p in pts for v in p)}"/>'
+    """Заточка: шестигранник af в x0 сходится к шестиграннику r_tip в x1."""
+    return _mesh(name, _hex_ring(x0, af / 2 / math.cos(math.radians(30))) + _hex_ring(x1, r_tip))
 
 
 def assets():
