@@ -130,6 +130,36 @@ def step_pose(ph: float, sweep: float, down: tuple[float, float], up: tuple[floa
             down[1] + (up[1] - down[1]) * k)
 
 
+LOG_HEADER = ["Время, с", "Темп. поворота, °C", "Темп. бедра, °C", "Темп. колена, °C",
+              "Ток поворота, А", "Ток бедра, А", "Ток колена, А",
+              "Нагрузка поворота, %", "Нагрузка бедра, %", "Нагрузка колена, %", "Напряжение, В"]
+
+
+def parse_grams(text: str) -> float | None:
+    """Показание весов, как его ввёл человек: «350», «350,5» или «350.5». Не число — None."""
+    t = text.replace(",", ".")
+    return float(t) if t.replace(".", "", 1).isdigit() else None
+
+
+def stance_ok(grams: float | None, end: float | None, load: float) -> bool:
+    """Норма стойки: держит ≥ 300 г, за время стойки просело не больше 10 %, бедро нагружено ≤ 80 %."""
+    return bool(grams and grams >= 300 and end is not None and end >= 0.9 * grams and load <= 80)
+
+
+def abort_reason(peak: dict, volt: float, vmin: float) -> str:
+    """Почему остановить шаг: датчик привода дошёл до 65 °C или напряжение ниже допустимого. Пусто — шагать дальше."""
+    if max(peak.values()) >= 65:
+        return "остановлен: датчик привода 65 °C"
+    if volt < vmin:
+        return f"остановлен: напряжение {volt:.1f} В"
+    return ""
+
+
+def gait_ok(aborted: str, femur_peak: float, case: float | None) -> bool:
+    """Норма шага: не остановлен, датчик бедра и корпус по термопаре (если мерили) ≤ 60 °C."""
+    return not aborted and femur_peak <= 60 and (case is None or case <= 60)
+
+
 class Leg:
     """Нога поверх стенда (Bench): позы, чтение углов, тесты."""
 
@@ -299,43 +329,59 @@ class Leg:
         self.hold_current_pose()
         r0, h0 = GEOM.stance_target()
         self.goto(0.0, *GEOM.ik(r0, h0 + 4.0), seconds=1.2)                     # над весами
+        grams = self._press_until_weight(r0, h0)
+        print(f"  Держу {hold_s:.0f} с…")
+        loads, amps, rise = self._hold_stance(hold_s)
+        end, amp = self._stance_readings(grams, amps)
+        self.goto(0.0, *GEOM.ik(r0, h0 + 4.0), seconds=0.8)
+        self.torque(False)
+        load = statistics.mean(loads) if loads else 0.0
+        self.stand = dict(grams=grams, end=end, load=load, amps=amp)
+        self.b.add("Н2", f"Стойка на весах, {hold_s:.0f} с",
+                   f"{grams or 0:.0f} → {end or 0:.0f} г, нагрузка бедра {load:.0f} %, ток {amp:.2f} А",
+                   "≥ 300 г, просадка ≤ 10 %, нагрузка бедра ≤ 80 %", stance_ok(grams, end, load),
+                   f"стопа ниже стойки на {self.press_mm:.1f} мм; бедро нагрелось на {rise} °C")
+
+    def _press_until_weight(self, r0: float, h0: float) -> float | None:
+        """Опускать стопу по 0,5 мм, пока человек не введёт показание весов ≥ 300 г (или до 7,5 мм). Нажим — в press_mm."""
         press, grams = -4.0, None
         while press < 8.0:
             press += 0.5
             self.goto(0.0, *GEOM.ik(r0, h0 - press), seconds=0.3)
             fm = self.servos()["femur"].state()
-            default = ""
-            if hasattr(self.b.bus, "scale_grams") and self.b.auto and self.b.bus.scale_grams() >= 330:
-                default = f"{self.b.bus.scale_grams():.0f}"
             ans = self.b.ask(f"  стопа ниже на {press:+.1f} мм, нагрузка бедра {abs(fm.load_pct):.0f} %. "
-                             "Enter — сильнее; число — показание весов (г), если уже 300–400 г", default)
-            if ans.replace(",", ".").replace(".", "", 1).isdigit():
-                grams = float(ans.replace(",", "."))
+                             "Enter — сильнее; число — показание весов (г), если уже 300–400 г", self._scale_hint())
+            typed = parse_grams(ans)
+            if typed is not None:
+                grams = typed
                 if grams >= 300 or press >= 7.5:
                     break
         self.press_mm = max(press, 0.5)
-        print(f"  Держу {hold_s:.0f} с…")
-        t0, loads, amps, temps0 = self.b.clock(), [], [], {j: s.state().temp for j, s in self.servos().items()}
-        while self.b.clock() - t0 < hold_s:
-            sts_ = {j: s.state() for j, s in self.servos().items()}
-            loads.append(abs(sts_["femur"].load_pct))
-            amps.append(sum(self.amps(x) for x in sts_.values()))
-            self.b.sleep(1.0)
-        temps1 = {j: s.state().temp for j, s in self.servos().items()}
+        return grams
+
+    def _stance_readings(self, grams: float | None, amps: list) -> tuple[float | None, float]:
+        """Спросить показания в конце стойки: весы (г) и ток блока питания (А). Без ответа о токе — оценка по приводам."""
         end_default = f"{self.b.bus.scale_grams():.0f}" if hasattr(self.b.bus, "scale_grams") else str(grams or 0)
         end = self.b.ask_float("  Сколько показывают весы сейчас, г?", float(end_default or 0))
-        psu = self.b.ask_float("  Сколько ампер показывает блок питания?", round(statistics.mean(amps), 2) if amps else 0.1)
-        self.goto(0.0, *GEOM.ik(r0, h0 + 4.0), seconds=0.8)
-        self.torque(False)
-        load = statistics.mean(loads) if loads else 0.0
-        amp = psu if psu is not None else (statistics.mean(amps) if amps else 0.0)
-        self.stand = dict(grams=grams, end=end, load=load, amps=amp)
-        ok = bool(grams and grams >= 300 and end is not None and end >= 0.9 * grams and load <= 80)
-        rise = temps1["femur"] - temps0["femur"]
-        self.b.add("Н2", f"Стойка на весах, {hold_s:.0f} с",
-                   f"{grams or 0:.0f} → {end or 0:.0f} г, нагрузка бедра {load:.0f} %, ток {amp:.2f} А",
-                   "≥ 300 г, просадка ≤ 10 %, нагрузка бедра ≤ 80 %", ok,
-                   f"стопа ниже стойки на {self.press_mm:.1f} мм; бедро нагрелось на {rise} °C")
+        mean_a = statistics.mean(amps) if amps else 0.0
+        psu = self.b.ask_float("  Сколько ампер показывает блок питания?", round(mean_a, 2) if amps else 0.1)
+        return end, (psu if psu is not None else mean_a)
+
+    def _scale_hint(self) -> str:
+        """Ответ по умолчанию в самопроверке на имитации: что показали бы весы, когда уже набрано ≥ 330 г."""
+        if hasattr(self.b.bus, "scale_grams") and self.b.auto and self.b.bus.scale_grams() >= 330:
+            return f"{self.b.bus.scale_grams():.0f}"
+        return ""
+
+    def _hold_stance(self, hold_s: float) -> tuple[list, list, int]:
+        """Держать стойку hold_s секунд: нагрузка бедра и ток раз в секунду, нагрев бедра за всё время."""
+        t0, loads, amps, temps0 = self.b.clock(), [], [], {j: s.state().temp for j, s in self.servos().items()}
+        while self.b.clock() - t0 < hold_s:
+            st = {j: s.state() for j, s in self.servos().items()}
+            loads.append(abs(st["femur"].load_pct))
+            amps.append(sum(self.amps(x) for x in st.values()))
+            self.b.sleep(1.0)
+        return loads, amps, self.servos()["femur"].state().temp - temps0["femur"]
 
     # ---------- момент бедра ----------
     def femur_torque(self) -> None:
@@ -388,66 +434,65 @@ class Leg:
               f"на {lift_mm:.0f} мм. Так нагружена нога при ходьбе треногой.")
         if not self.ensure_cal():
             return
-        sweep = 0.0
         self.b.wait_enter("  Стенд прижат, стопа на столе (весы можно убрать — тогда подставку под стенд тоже), "
                           "термопара приклеена каптоном к приводу бедра (№2).")
-        if self.b.ask("  Двигать стопу вперёд-назад ±10°? Только если под стопой гладкая бумага (д/н)", "н").lower().startswith("д"):
-            sweep = 10.0
+        sweep = 10.0 if self.b.ask("  Двигать стопу вперёд-назад ±10°? Только если под стопой гладкая бумага (д/н)",
+                                   "н").lower().startswith("д") else 0.0
         if not self.precheck():
             return
         self.hold_current_pose()
         r0, h0 = GEOM.stance_target()
-        down = GEOM.ik(r0, h0 - self.press_mm)
-        up = GEOM.ik(r0, h0 + lift_mm)
+        down, up = GEOM.ik(r0, h0 - self.press_mm), GEOM.ik(r0, h0 + lift_mm)
         self.goto(0.0, *down, seconds=1.0)
         for s in self.servos().values():
             s.move(s.pos(), speed=0, accel=0)                      # дальше — только цели, максимальная скорость
-        sv = self.servos()
-        t0, last_log, aborted = self.b.clock(), -10.0, ""
-        rows, peak = [], {j: 0 for j in IDS}
         try:
-            while True:
-                el = self.b.clock() - t0
-                if el >= minutes * 60:
-                    break
-                self.stream(*step_pose((el % period) / period, sweep, down, up))
-                if el - last_log >= 2.0:
-                    last_log = el
-                    st = {j: s.state() for j, s in sv.items()}
-                    a = {j: self.amps(x) for j, x in st.items()}
-                    row = [round(el, 1)] + [st[j].temp for j in IDS] + [round(a[j], 3) for j in IDS] + \
-                          [round(abs(st[j].load_pct)) for j in IDS] + [st["femur"].volt]
-                    rows.append(row)
-                    for j in IDS:
-                        peak[j] = max(peak[j], st[j].temp)
-                    print(f"\r  {el / 60:4.1f} мин: темп. {st['coxa'].temp}/{st['femur'].temp}/{st['knee'].temp} °C, "
-                          f"ток {sum(a.values()):.2f} А, {st['femur'].volt:.1f} В   ", end="", flush=True)
-                    if max(peak.values()) >= 65:
-                        aborted = "остановлен: датчик привода 65 °C"
-                        break
-                    if st["femur"].volt < self.b.p.vmin:
-                        aborted = f"остановлен: напряжение {st['femur'].volt:.1f} В"
-                        break
-                self.b.sleep(0.04)
+            rows, peak, aborted = self._walk(minutes * 60, period, sweep, down, up)
         finally:
             try:
                 self.goto(0.0, *GEOM.ik(r0, h0 + 4.0), seconds=0.8)
             finally:
                 self.torque(False)
             print()
-        self.b.log_header = ["Время, с", "Темп. поворота, °C", "Темп. бедра, °C", "Темп. колена, °C",
-                             "Ток поворота, А", "Ток бедра, А", "Ток колена, А",
-                             "Нагрузка поворота, %", "Нагрузка бедра, %", "Нагрузка колена, %", "Напряжение, В"]
-        self.b.log_rows = rows
+        self._gait_report(minutes, rows, peak, aborted)
+
+    def _walk(self, seconds: float, period: float, sweep: float, down, up) -> tuple[list, dict, str]:
+        """Шагать seconds секунд; раз в 2 с — строка журнала. Остановиться по нагреву или напряжению."""
+        t0, last_log = self.b.clock(), -10.0
+        rows, peak = [], {j: 0 for j in IDS}
+        while (el := self.b.clock() - t0) < seconds:
+            self.stream(*step_pose((el % period) / period, sweep, down, up))
+            if el - last_log >= 2.0:
+                last_log = el
+                st = self._log_sample(el, rows)
+                for j in IDS:
+                    peak[j] = max(peak[j], st[j].temp)
+                aborted = abort_reason(peak, st["femur"].volt, self.b.p.vmin)
+                if aborted:
+                    return rows, peak, aborted
+            self.b.sleep(0.04)
+        return rows, peak, ""
+
+    def _log_sample(self, el: float, rows: list) -> dict:
+        """Прочитать все три привода, дописать строку журнала (колонки LOG_HEADER) и показать её на экране."""
+        st = {j: s.state() for j, s in self.servos().items()}
+        a = {j: self.amps(x) for j, x in st.items()}
+        rows.append([round(el, 1)] + [st[j].temp for j in IDS] + [round(a[j], 3) for j in IDS]
+                    + [round(abs(st[j].load_pct)) for j in IDS] + [st["femur"].volt])
+        print(f"\r  {el / 60:4.1f} мин: темп. {st['coxa'].temp}/{st['femur'].temp}/{st['knee'].temp} °C, "
+              f"ток {sum(a.values()):.2f} А, {st['femur'].volt:.1f} В   ", end="", flush=True)
+        return st
+
+    def _gait_report(self, minutes: float, rows: list, peak: dict, aborted: str) -> None:
+        self.b.log_header, self.b.log_rows = list(LOG_HEADER), rows
         mean_i = statistics.mean(sum(r[4:7]) for r in rows) if rows else 0.0
         case = self.b.ask_float("  Температура корпуса бедра по термопаре в конце, °C («-» — не мерил)", float(peak["femur"] - 3))
         psu = self.b.ask_float("  Сколько в среднем показывал блок питания при шаге, А?", round(mean_i, 2))
         leg_a = psu if psu is not None else mean_i
-        ok = not aborted and peak["femur"] <= 60 and (case is None or case <= 60)
         self.b.add("Н4", f"Шаг на месте, {minutes:.0f} мин",
                    f"датчики {peak['coxa']}/{peak['femur']}/{peak['knee']} °C, корпус бедра "
                    f"{case if case is not None else '—'} °C, ток ноги {leg_a:.2f} А",
-                   "бедро ≤ 60 °C (паспорт: работа до 60 °C, отключение 70 °C)", ok, aborted)
+                   "бедро ≤ 60 °C (паспорт: работа до 60 °C, отключение 70 °C)", gait_ok(aborted, peak["femur"], case), aborted)
         self.battery(leg_a)
 
     def battery(self, leg_walk_a: float) -> None:

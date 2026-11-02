@@ -395,3 +395,46 @@ def test_gait_stops_on_low_voltage(calibrated, bus):
     r = result(calibrated.b, "Н4")
     assert r["verdict"] == "НЕ ОК" and "напряжение" in r["note"]
     assert len(calibrated.b.log_rows) == 1
+
+
+# ---------- нормы и разбор ввода (чистые функции) ----------
+@pytest.mark.parametrize("text, grams", [("350", 350.0), ("350,5", 350.5), ("350.5", 350.5), ("", None), ("много", None),
+                                         ("1.2.3", None), ("-5", None)])
+def test_parse_grams_reads_scale_input(text, grams):
+    from harvey_bench.leg import parse_grams
+
+    assert parse_grams(text) == grams
+
+
+@pytest.mark.parametrize("grams, end, load, ok", [
+    (300, 270, 80, True),                     # ровно на границах норм
+    (299, 299, 10, False),                    # мало веса
+    (400, 359, 10, False),                    # просадка больше 10 %
+    (400, 400, 81, False),                    # бедро на пределе
+    (None, 400, 10, False),                   # вес не ввели
+    (400, None, 10, False),                   # конец не ввели
+])
+def test_stance_ok_norms(grams, end, load, ok):
+    from harvey_bench.leg import stance_ok
+
+    assert stance_ok(grams, end, load) is ok
+
+
+@pytest.mark.parametrize("peak, volt, reason", [
+    ({"coxa": 30, "femur": 64, "knee": 30}, 6.0, ""),
+    ({"coxa": 65, "femur": 40, "knee": 30}, 6.0, "остановлен: датчик привода 65 °C"),
+    ({"coxa": 30, "femur": 40, "knee": 30}, 5.39, "остановлен: напряжение 5.4 В"),
+    ({"coxa": 30, "femur": 40, "knee": 30}, 5.4, ""),
+])
+def test_abort_reason_heat_then_voltage(peak, volt, reason):
+    from harvey_bench.leg import abort_reason
+
+    assert abort_reason(peak, volt, vmin=5.4) == reason
+
+
+@pytest.mark.parametrize("aborted, femur, case, ok", [
+    ("", 60, 60, True), ("", 61, None, False), ("", 50, 61, False), ("", 50, None, True), ("остановлен", 40, 40, False)])
+def test_gait_ok_norms(aborted, femur, case, ok):
+    from harvey_bench.leg import gait_ok
+
+    assert gait_ok(aborted, femur, case) is ok
