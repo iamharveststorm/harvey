@@ -438,3 +438,63 @@ def test_gait_ok_norms(aborted, femur, case, ok):
     from harvey_bench.leg import gait_ok
 
     assert gait_ok(aborted, femur, case) is ok
+
+
+# ---------- калибровка и момент: чистые функции ----------
+@pytest.mark.parametrize("pos, offset", [(2048, 0), (2051, 0), (2045, 0), (2052, 4), (2044, -4), (1800, -248)])
+def test_middle_offset_ignores_three_steps_of_noise(pos, offset):
+    from harvey_bench.leg import middle_offset
+
+    assert middle_offset(pos) == offset
+
+
+@pytest.mark.parametrize("ans, sign", [("д", 1), ("Д", 1), ("да", 1), ("", 1), ("н", -1), ("Нет", -1)])
+def test_direction_from_yes_no_answer(ans, sign):
+    from harvey_bench.leg import direction
+
+    assert direction(ans) == sign
+
+
+def test_torque_nm_from_scale_and_arm():
+    from harvey_bench.leg import torque_nm
+
+    assert torque_nm(1000.0, 27.0) == pytest.approx(0.26487)          # 1 кг × 9,81 × 0,027 м
+    assert torque_nm(1665.0, 27.1) == pytest.approx(0.4426, abs=1e-4)  # как в паспорте: 0,44 Н·м
+
+
+@pytest.mark.parametrize("psu, stall", [(1.5, 1.46), (1.2, 1.16), (None, None), (0.0, None)])
+def test_stall_current_minus_two_idle_servos(psu, stall):
+    from harvey_bench.leg import stall_current
+
+    got = stall_current(psu, idle_a=0.02)
+    assert got == (pytest.approx(stall) if stall is not None else None)
+
+
+def test_femur_torque_releases_the_leg_at_the_end(calibrated, bus):
+    calibrated.femur_torque()
+    assert all(s.mem[sts.TORQUE_ENABLE[0]] == 0 for s in bus.servos.values())
+
+
+def test_press_femur_lifts_three_degrees_right_after(calibrated, bus):
+    calibrated.hold_current_pose()
+    r0, h0 = GEOM.stance_target()
+    calibrated.goto(0.0, *GEOM.ik(r0, h0 + 1.0), seconds=1.0)
+    *_, a = calibrated._press_femur(r0, h0)
+    goal = bus.servos[IDS["femur"]].mem[sts.GOAL_POS[0]]
+    assert calibrated.cal.to_deg("femur", goal) == pytest.approx(a["femur"] + 3.0, abs=sts.DEG_PER_STEP)
+
+
+def test_swing_starts_from_real_pose_g_when_middle_is_not_written(leg, bus, monkeypatch):
+    monkeypatch.setattr(sts.Servo, "set_middle", lambda self: None)
+    moved = {}
+
+    def ask(text, default=""):
+        for j, i in IDS.items():
+            if NAMES[j].capitalize() + " сдвинулся" in text:
+                moved[j] = leg.cal.to_deg(j, leg.b.servo(i).pos()) - REF[j]     # от настоящей «Г», со смещением
+        return default
+
+    leg.b.ask = ask
+    leg.calibrate()
+    assert any(leg.cal.offset.values())
+    assert moved == pytest.approx({j: 10.0 for j in IDS}, abs=1.0)

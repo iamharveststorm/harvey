@@ -160,6 +160,31 @@ def gait_ok(aborted: str, femur_peak: float, case: float | None) -> bool:
     return not aborted and femur_peak <= 60 and (case is None or case <= 60)
 
 
+QUESTIONS = {"coxa": "Нога повернулась ПРОТИВ часовой стрелки, если смотреть сверху?",
+             "femur": "Бедро поднялось ВВЕРХ?",
+             "knee": "Низ голени ушёл НАРУЖУ — от стенда?"}
+
+
+def middle_offset(pos: int) -> int:
+    """Насколько привод не принял «середину» (шагов). До 3 шагов — шум датчика, считаем, что записалась."""
+    return 0 if abs(pos - sts.MIDDLE) <= 3 else pos - sts.MIDDLE
+
+
+def direction(answer: str) -> int:
+    """Сустав сдвинулся «+10°» туда, куда надо? «н…» — нет, направление обратное (−1); иначе +1."""
+    return -1 if answer.lower().startswith("н") else 1
+
+
+def torque_nm(grams: float, arm_mm: float) -> float:
+    """Момент бедра (Н·м) по показанию весов (г) и плечу стопы от оси бедра (мм)."""
+    return grams / 1000 * 9.81 * arm_mm / 1000
+
+
+def stall_current(psu_a: float | None, idle_a: float) -> float | None:
+    """Ток бедра в упоре: показание блока питания минус покой двух других приводов ноги. Нет показания — None."""
+    return (psu_a - 2 * idle_a) if psu_a else None
+
+
 class Leg:
     """Нога поверх стенда (Bench): позы, чтение углов, тесты."""
 
@@ -251,39 +276,44 @@ class Leg:
         self.b.wait_enter("  Момент выключен. Поставь стенд у края стола — нога смотрит за край (в позе «Г» стопа ниже стола). "
                           "Рукой поставь ногу буквой «Г»: поворот прямо от стенда, бедро горизонтально (по уровню в телефоне), "
                           "голень вертикально вниз.")
-        if hasattr(self.b.bus, "table"):
-            self.b.bus.table = False                              # имитация: нога за краем стола
+        self._sim_table(False)                                    # имитация: нога за краем стола
         sv = self.servos()
-        for j, s in sv.items():
-            s.set_middle()
-        self.b.sleep(0.2)
-        for j, s in sv.items():
-            p = s.pos()
-            self.cal.offset[j] = 0 if abs(p - sts.MIDDLE) <= 3 else p - sts.MIDDLE
-            print(f"  {NAMES[j]}: позиция {p}" + ("" if self.cal.offset[j] == 0 else
-                                                 f" — середина не записалась, учту программно ({self.cal.offset[j]:+d})"))
-        self.cal.sign = {j: 1 for j in IDS}
-        questions = {"coxa": "Нога повернулась ПРОТИВ часовой стрелки, если смотреть сверху?",
-                     "femur": "Бедро поднялось ВВЕРХ?",
-                     "knee": "Низ голени ушёл НАРУЖУ — от стенда?"}
-        for j in ("coxa", "femur", "knee"):
-            s = sv[j]
-            self.hold_current_pose(limit=40)
-            s.move(sts.MIDDLE + self.cal.offset[j] + int(10 / sts.DEG_PER_STEP), speed=300, accel=20)
-            self.b.sleep(1.0)
-            ans = self.b.ask(f"  {NAMES[j].capitalize()} сдвинулся на 10°. {questions[j]} (д/н)", "д").lower()
-            self.cal.sign[j] = -1 if ans.startswith("н") else 1
-            s.move(sts.MIDDLE + self.cal.offset[j], speed=300, accel=20)
-            self.b.sleep(1.0)
+        self._write_middle(sv)
+        self.cal.sign = {j: self._ask_direction(j, sv[j]) for j in ("coxa", "femur", "knee")}
         self.torque(False)
-        if hasattr(self.b.bus, "table"):
-            self.b.bus.table = True
+        self._sim_table(True)
         self.b.wait_enter("  Готово. Верни стенд на место (нога над столом).")
         self.cal.checked = True
         self.cal.save()
         signs = ", ".join(f"{NAMES[j]} {'+' if v > 0 else '−'}" for j, v in self.cal.sign.items())
         self.b.add("к", "Калибровка ноги", f"середина записана; направления: {signs}", "поза «Г» = 2048", True,
                    f"файл {CAL_FILE}")
+
+    def _write_middle(self, sv: dict) -> None:
+        """Записать текущую позу («Г») серединой 2048 во все приводы; что не записалось — запомнить смещением."""
+        for s in sv.values():
+            s.set_middle()
+        self.b.sleep(0.2)
+        for j, s in sv.items():
+            p = s.pos()
+            self.cal.offset[j] = middle_offset(p)
+            print(f"  {NAMES[j]}: позиция {p}" + ("" if self.cal.offset[j] == 0 else
+                                                 f" — середина не записалась, учту программно ({self.cal.offset[j]:+d})"))
+
+    def _ask_direction(self, j: str, s: sts.Servo) -> int:
+        """Сдвинуть сустав на +10°, спросить, туда ли он пошёл, вернуть в «Г». Ответ — направление «+» сустава."""
+        self.hold_current_pose(limit=40)
+        s.move(sts.MIDDLE + self.cal.offset[j] + int(10 / sts.DEG_PER_STEP), speed=300, accel=20)
+        self.b.sleep(1.0)
+        sign = direction(self.b.ask(f"  {NAMES[j].capitalize()} сдвинулся на 10°. {QUESTIONS[j]} (д/н)", "д"))
+        s.move(sts.MIDDLE + self.cal.offset[j], speed=300, accel=20)
+        self.b.sleep(1.0)
+        return sign
+
+    def _sim_table(self, on: bool) -> None:
+        """Только для имитации (--sim): есть ли под стопой стол с весами. На настоящей шине ничего не делает."""
+        if hasattr(self.b.bus, "table"):
+            self.b.bus.table = on
 
     def ensure_cal(self) -> bool:
         if not self.cal.checked:
@@ -395,8 +425,20 @@ class Leg:
         self.hold_current_pose()
         r0, h0 = GEOM.stance_target()
         self.goto(0.0, *GEOM.ik(r0, h0 + 1.0), seconds=1.0)
+        loads, amps, raw, peak_g, a = self._press_femur(r0, h0)
+        self.b.sleep(0.5)
+        self.goto(0.0, *GEOM.ik(r0, h0 + 4.0), seconds=0.8)
+        self.torque(False)
+        grams_default = round(peak_g) if hasattr(self.b.bus, "scale_grams") else 1500
+        grams = self.b.ask_float("  Максимум на весах, г", float(grams_default))
+        psu = self.b.ask_float("  Максимум тока на блоке питания, А", round(max(amps), 2) if amps else 1.2)
+        self._torque_report(grams, psu, a, max(loads) if loads else 0.0, max(raw) if raw else None)
+
+    def _press_femur(self, r0: float, h0: float) -> tuple[list, list, list, float, dict]:
+        """Бедро давит стопой в весы 1,5 с (цель — на 15 мм ниже стола), потом сразу снимает усилие.
+        Возвращает нагрузку и ток за это время, ток бедра из регистра, пик весов имитации и углы в упоре."""
         sv = self.servos()
-        qf, qk = GEOM.ik(r0, h0 - 15.0)
+        qf, _ = GEOM.ik(r0, h0 - 15.0)
         sv["femur"].move(self.cal.to_pos("femur", clamp("femur", qf)))
         t0, loads, amps, raw, peak_g = self.b.clock(), [], [], [], 0.0
         try:
@@ -410,20 +452,16 @@ class Leg:
         finally:
             a = self.angles()
             sv["femur"].move(self.cal.to_pos("femur", a["femur"] + 3.0), speed=800, accel=20)      # сразу снять усилие
-        grams_default = round(peak_g) if hasattr(self.b.bus, "scale_grams") else 1500
-        self.b.sleep(0.5)
-        self.goto(0.0, *GEOM.ik(r0, h0 + 4.0), seconds=0.8)
-        self.torque(False)
-        grams = self.b.ask_float("  Максимум на весах, г", float(grams_default))
-        psu = self.b.ask_float("  Максимум тока на блоке питания, А", round(max(amps), 2) if amps else 1.2)
-        arm = GEOM.horizontal(math.radians(a["femur"]), math.radians(a["knee"]))
-        load = max(loads) if loads else 0.0
+        return loads, amps, raw, peak_g, a
+
+    def _torque_report(self, grams: float | None, psu: float | None, a: dict, load: float, raw_a: float | None) -> None:
         if grams is None:
             self.b.add("Н3", "Момент бедра", "не измерен", "≥ 0,36 Н·м", None)
             return
-        nm = grams / 1000 * 9.81 * arm / 1000
-        stall_i = (psu - 2 * self.b.p.idle_a) if psu else None
-        self.b.calibrate_current(max(raw) if raw else None, stall_i)
+        arm = GEOM.horizontal(math.radians(a["femur"]), math.radians(a["knee"]))
+        nm = torque_nm(grams, arm)
+        stall_i = stall_current(psu, self.b.p.idle_a)
+        self.b.calibrate_current(raw_a, stall_i)
         self.b.add("Н3", "Момент бедра (упор)", f"{nm:.3f} Н·м ({nm / 0.0981:.1f} кг·см): {grams:.0f} г на плече {arm:.1f} мм",
                    "≥ 0,36 Н·м (паспорт 0,44)", nm >= 0.36,
                    f"нагрузка {load:.0f} %; ток в упоре ≈ {stall_i:.2f} А (паспорт 1,2 А)" if stall_i else f"нагрузка {load:.0f} %")
