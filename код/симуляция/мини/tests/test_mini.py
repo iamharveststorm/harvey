@@ -215,3 +215,11 @@ def test_tilt_reads_body_roll(deg):
     s.d.qpos[s.m.jnt_qposadr[s.m.body("torso").jntadr[0]] + 3:][:4] = [math.cos(a / 2), math.sin(a / 2), 0, 0]
     mujoco.mj_kinematics(s.m, s.d)
     assert s.tilt() == pytest.approx(deg, abs=1e-6)
+
+
+def test_relaxed_robot_applies_no_torque():
+    s = hm.Mini()
+    s.q["LF_f"] += 0.3
+    s.relaxed = True
+    s.step(False)
+    assert not s.d.ctrl.any()

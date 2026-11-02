@@ -260,6 +260,7 @@ class Mini:
         self.kp = {"c": 3.0, "f": 4.0, "k": 4.0, "y": 2.0, "p": 3.0, "e": 3.0, "g": 1.0, "s": 1.0}
         self.kd = 0.03
         self.grip_lim = 0.12                      # ограничение момента захвата (ток в STS3032), Н·м
+        self.relaxed = False                      # приводы отпущены (момент выключен): робот обмякает
         self.q = {k: 0.0 for k in self.j}; self.tq = {k: [] for k in self.j}; self.viol = 0
         st = self.stand_q(); self.q.update(st)
         for k, v in st.items(): self.d.qpos[self.j[k][0]] = v
@@ -282,7 +283,7 @@ class Mini:
             tau = self.kp[t] * e - self.kd * w
             lim = self.grip_lim if t == "g" else STALL
             if (tau > 0) == (w > 0) and tau and w: lim = min(lim, STALL * max(0.0, 1 - abs(w) / W0))
-            tau = min(lim, max(-lim, tau)); d.ctrl[aid] = tau
+            tau = 0.0 if self.relaxed else min(lim, max(-lim, tau)); d.ctrl[aid] = tau
             if record: self.tq[k].append(abs(tau))
         mujoco.mj_step(self.m, d)
 
