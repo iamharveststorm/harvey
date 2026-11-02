@@ -107,6 +107,44 @@ def test_gait_tripods_alternate_and_lift():
     assert max(max(v) for v in heights.values()) == pytest.approx(0.015, abs=0.0015)
 
 
+def test_walker_walks_at_commanded_speed():
+    s = hm.Mini()
+    w = hm.Walker(s)
+    s.run(0.5, record=False)
+    x0, y0 = s.d.body("torso").xpos[:2]
+    for _ in range(int(6.0 / hm.DT)):
+        w.step(np.array([0.06, 0.0, 0.0]))
+        s.step(False)
+    x1, y1 = s.d.body("torso").xpos[:2]
+    assert 5.0 <= (x1 - x0) / 6.0 * 100 <= 8.0
+    assert abs(y1 - y0) < 0.015
+
+
+def test_walker_stands_still_without_command():
+    s = hm.Mini()
+    w = hm.Walker(s)
+    stand = s.stand_q()
+    w.step(np.zeros(3))
+    assert all(s.q[k] == pytest.approx(v, abs=1e-9) for k, v in stand.items())
+
+
+def test_table_has_edges():
+    s = hm.Mini(world_xml=hm.table_xml(-0.3, 0.3, -0.3, 0.3))
+    gid = np.zeros(1, np.int32)
+    grp = np.array([1, 0, 0, 0, 0, 0], np.uint8)
+    on = mujoco.mj_ray(s.m, s.d, np.array([0.2, 0.0, 0.1]), np.array([0.0, 0.0, -1.0]), grp, 1, -1, gid)
+    off = mujoco.mj_ray(s.m, s.d, np.array([0.4, 0.0, 0.1]), np.array([0.0, 0.0, -1.0]), grp, 1, -1, gid)
+    assert on == pytest.approx(0.1, abs=1e-6) and off == pytest.approx(0.1 + hm.FLOOR_DROP, abs=1e-6)
+
+
+def test_contact_force_on_the_floor_carries_the_weight():
+    s = hm.Mini()
+    s.run(1.0, record=False)
+    floor = s.m.geom("floor").id
+    total = sum(hm.contact_force(s.m, s.d, floor, s.m.geom(f"{n}_foot").id) for n in LEGS)
+    assert total == pytest.approx(float(sum(s.m.body_mass)) * 9.81, rel=0.1)
+
+
 # ---------- сценарии с нормами ----------
 def test_stand_scenario():
     r = hm.test_stand()

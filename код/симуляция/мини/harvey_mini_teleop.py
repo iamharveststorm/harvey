@@ -65,15 +65,10 @@ def world_model():
     # пока сила трения больше веса (в мягкой модели по умолчанию лёгкие предметы медленно выползают из захвата)
     xml = xml.replace('<option timestep="0.0005" integrator="implicitfast"/>',
                       '<option timestep="0.0005" integrator="implicitfast" cone="elliptic" noslip_iterations="3"/>')
-    # камера Харви: Camera Module 3 Wide в передней стенке (CAD: объектив Ø9 на x = 61,5…66 мм, z = 8,5 мм над осями бедра);
-    # смотрит вперёд, поле зрения 67° по вертикали (≈ 100° по горизонтали в кадре 16 : 9) — как у настоящей
-    xml = xml.replace('<geom name="body" type="box"', CAMERA + '<geom name="body" type="box"', 1)
+    xml = xml.replace('<geom name="body" type="box"', H.CAMERA + '<geom name="body" type="box"', 1)
     assets = {k: v for k, v in W.load_assets().items() if k.startswith("world/")}
     assets.update(H.load_assets())
     return xml, assets
-
-
-CAMERA = '<camera name="harvey_eye" pos="0.0662 0 0.0085" xyaxes="0 -1 0 0 0 1" fovy="67"/>'
 
 
 def near_plane(m, near=0.003):
@@ -107,8 +102,8 @@ class MiniTeleop:
 
     # ---------- состояние ----------
     def _init_state(self):
-        self.cmd = np.zeros(3); self.vel = np.zeros(3); self.held = set(); self.claw_held = set()
-        self.fast = False; self.phase = 0.0; self.t = 0.0
+        self.cmd = np.zeros(3); self.walker = H.Walker(self.sim); self.held = set(); self.claw_held = set()
+        self.fast = False; self.t = 0.0
         self.dz = 0.0; self.dz_t = 0.0; self.pose = "стоит"
         self.pitch = 0.0; self.pitch_t = 0.0                    # наклон корпуса (и камеры) ногами: + — нос вниз, рад
         self.claw_sel = "LR"; self.guard = True; self.macro = None; self.msg = "готов"
@@ -400,27 +395,14 @@ class MiniTeleop:
             try: next(self.macro)
             except StopIteration: self.macro = None
         t_half = 0.24 if self.fast else 0.30
-        self.vel += np.clip(self.cmd - self.vel, -0.0004, 0.0004)
+        self.walker.accelerate(self.cmd)
         if self.guard:
             for axis, sign, name in ((0, 1, "впереди"), (0, -1, "сзади"), (1, 1, "слева"), (1, -1, "справа")):
                 if self.vel[axis] * sign > 1e-4 and int(self.t / DT) % 20 == 0 and self.edge_seen(axis, sign):
                     self.vel[axis] = 0; self.cmd[axis] = 0; self.held.clear(); self.msg = f"край стола {name} — стоп"
         self.dz += float(np.clip(self.dz_t - self.dz, -0.02 * DT, 0.02 * DT))
         self.pitch += float(np.clip(self.pitch_t - self.pitch, -math.radians(30) * DT, math.radians(30) * DT))
-        moving = np.linalg.norm(self.vel) > 1e-3
-        if moving: self.phase = (self.phase + DT / (2 * t_half)) % 1.0
-        h0 = -(H.ZJ - H.FOOT_R) + self.dz
-        for n in H.MOUNTS:
-            p0 = H.neutral(n); z = 0.0; u = 0.0
-            if moving:
-                pp = self.phase if n in H.TRIPOD_A else (self.phase + 0.5) % 1.0
-                if pp < 0.5: u = 0.5 - 2 * pp
-                else:
-                    s_ = (pp - 0.5) * 2; u = -0.5 + (s_ - math.sin(2 * math.pi * s_) / (2 * math.pi)); z = 0.015 * math.sin(math.pi * s_)
-            a = self.vel[2] * t_half * u; c, sn = math.cos(a), math.sin(a)
-            p = np.array([c * p0[0] - sn * p0[1], sn * p0[0] + c * p0[1]]) + self.vel[:2] * t_half * u
-            hp = math.tan(self.pitch) * p[0]                     # нос вниз: передние стопы ближе к корпусу, задние — дальше
-            for j, v in zip("cfk", H.leg_ik(n, p, h0 + z + hp)): self.sim.q[f"{n}_{j}"] = v
+        self.walker.legs(self.dz, self.pitch, t_half)
         self._arm_step()
         for s in "LR": self.sim.q[f"{s}_s"] = math.radians(self.eyes[s])
         self.sim.step(record=False)
@@ -430,6 +412,10 @@ class MiniTeleop:
         if int(self.t / DT) % 50 == 0: self.charging = self._contacts_charging(); self._grip_sense()
         if self.charging: self.energy = min(CAP_J, self.energy + 12.0 * DT)
         self.t += DT
+
+    @property
+    def vel(self):
+        return self.walker.vel
 
     def status(self):
         tb = self.sim.d.body("torso"); v = np.linalg.norm(self.vel[:2]) * 100

@@ -57,6 +57,27 @@ def _vis(body, key=None):
 
 
 DOCK_X = 0.20                                          # станция в 20 см перед стартом
+FLOOR_DROP = 0.75                                      # стол: пол на 75 см ниже столешницы
+# камера Харви: Camera Module 3 Wide в передней стенке (CAD: объектив Ø9 на x = 61,5…66 мм, z = 8,5 мм над осями бедра);
+# смотрит вперёд, поле зрения 67° по вертикали (≈ 100° по горизонтали в кадре 16 : 9) — как у настоящей
+CAMERA = '<camera name="harvey_eye" pos="0.0662 0 0.0085" xyaxes="0 -1 0 0 0 1" fovy="67"/>'
+
+
+def table_xml(x0, x1, y0, y1):
+    """Стол с краями: столешница (верх z = 0) от x0 до x1 и от y0 до y1, пол на FLOOR_DROP ниже."""
+    return (f'<geom name="table" type="box" size="{(x1 - x0) / 2} {(y1 - y0) / 2} 0.01" pos="{(x0 + x1) / 2} {(y0 + y1) / 2} -0.01" '
+            f'friction="0.8 0.01 0.001" rgba=".78 .64 .46 1"/>'
+            f'<geom name="floor" type="plane" size="3 3 0.1" pos="0 0 {-FLOOR_DROP}" rgba=".5 .5 .5 1"/>')
+
+
+def contact_force(m, d, geom_a, geom_b):
+    """Сумма нормальных сил во всех контактах пары тел."""
+    f6 = np.zeros(6); total = 0.0
+    for i in range(d.ncon):
+        c = d.contact[i]
+        if {c.geom1, c.geom2} == {geom_a, geom_b}:
+            mujoco.mj_contactForce(m, d, i, f6); total += abs(f6[0])
+    return total
 
 
 def dock_xml(visual, pos=None):
@@ -316,6 +337,37 @@ class Mini:
         self.run(sec, fn)
 
 
+class Walker:
+    """Походка трипод по команде скорости (vx, vy м/с, wz рад/с): плавный разгон, фаза треног, IK ног в sim.q.
+    Наклон корпуса pitch (рад, + — нос вниз) — ногами: передние стопы ближе к корпусу, задние — дальше."""
+
+    def __init__(self, sim, accel=0.0004, lift=0.015):
+        self.sim, self.accel, self.lift = sim, accel, lift
+        self.vel = np.zeros(3); self.phase = 0.0
+
+    def step(self, cmd, dz=0.0, pitch=0.0, t_half=0.30):
+        self.accelerate(cmd); self.legs(dz, pitch, t_half)
+
+    def accelerate(self, cmd):
+        self.vel += np.clip(np.asarray(cmd, float) - self.vel, -self.accel, self.accel)
+
+    def legs(self, dz=0.0, pitch=0.0, t_half=0.30):
+        moving = np.linalg.norm(self.vel) > 1e-3
+        if moving: self.phase = (self.phase + DT / (2 * t_half)) % 1.0
+        h0 = -(ZJ - FOOT_R) + dz
+        for n in MOUNTS:
+            p0 = neutral(n); z = 0.0; u = 0.0
+            if moving:
+                pp = self.phase if n in TRIPOD_A else (self.phase + 0.5) % 1.0
+                if pp < 0.5: u = 0.5 - 2 * pp
+                else:
+                    s_ = (pp - 0.5) * 2; u = -0.5 + (s_ - math.sin(2 * math.pi * s_) / (2 * math.pi)); z = self.lift * math.sin(math.pi * s_)
+            a = self.vel[2] * t_half * u; c, sn = math.cos(a), math.sin(a)
+            p = np.array([c * p0[0] - sn * p0[1], sn * p0[0] + c * p0[1]]) + self.vel[:2] * t_half * u
+            hp = math.tan(pitch) * p[0]
+            for jj, v in zip("cfk", leg_ik(n, p, h0 + z + hp)): self.sim.q[f"{n}_{jj}"] = v
+
+
 LEGS_F = [f"{n}_f" for n in MOUNTS]; LEGS_K = [f"{n}_k" for n in MOUNTS]; LEGS_C = [f"{n}_c" for n in MOUNTS]
 
 
@@ -424,13 +476,8 @@ def test_dock():
         fn(t); s.step(False); t += DT
     s.q.update(s.stand_q()); s.run(0.5, record=False)
     s.crouch(CAD["rest_drop"] * mm, 1.0); s.run(0.5, record=False)
-    m, d = s.m, s.d; bid = m.geom("body").id; f6 = np.zeros(6); F = {}
-    for i in range(d.ncon):
-        c = d.contact[i]
-        for k in range(2):
-            gid = m.geom(f"pogo{k}").id
-            if {c.geom1, c.geom2} == {bid, gid}:
-                mujoco.mj_contactForce(m, d, i, f6); F[k] = F.get(k, 0) + abs(f6[0])
+    m, d = s.m, s.d; bid = m.geom("body").id
+    F = {k: contact_force(m, d, bid, m.geom(f"pogo{k}").id) for k in range(2)}
     err = s.d.body("torso").xpos[:2] - [DOCK_X, 0]
     feet_on_pad = sum(1 for n in MOUNTS for i in range(d.ncon) if m.geom(f"{n}_foot").id in (d.contact[i].geom1, d.contact[i].geom2)
                       and m.geom("dock_pad").id in (d.contact[i].geom1, d.contact[i].geom2))
