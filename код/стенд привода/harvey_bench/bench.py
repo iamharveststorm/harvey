@@ -46,6 +46,33 @@ def heat_ok(peak_t: int, mean_i: float, case_t: float | None, aborted: str) -> b
     return peak_t <= 70 and mean_i <= 1.1 and (case_t is None or case_t <= 65) and not aborted
 
 
+EMPTY_BUS_HINT = {
+    "sts3215": "  Никого. Проверь питание 12 В, кабель и что красный провод от адаптера отключён (см. README).",
+    "sts3032": "  Никого. Проверь: 6,0 В на клеммах адаптера, переходник 1,25 → 5264 в разъёме TTL (3 контакта), USB.",
+}
+
+
+def model_label(profile: sts.Profile, model: int) -> str:
+    """Как назвать найденный привод по номеру модели в регистре 3."""
+    short = profile.title.split()[0]
+    if profile.model is None:
+        return f"{short}? модель {model} — номер запишется в отчёт"
+    if model == profile.model:
+        return short
+    return f"модель {model} — НЕ {short}! Проверь привод и режим стенда"
+
+
+def scan_note(found: list[int], models: list[int]) -> str:
+    return "номера: " + ", ".join(map(str, found)) + ("; модель в регистре: " + ", ".join(map(str, models)) if models else "")
+
+
+def scaled_lsb(lsb: float, psu_a: float | None, register_a: float) -> float | None:
+    """Новый масштаб тока по блоку питания в упоре. None — сверять не с чем (нет показания или регистр почти пуст)."""
+    if psu_a and register_a > 0.5:
+        return lsb * psu_a / register_a
+    return None
+
+
 class Bench:
     def __init__(self, bus, auto: bool = False, speedup: float = 1.0, clock=time.monotonic,
                  profile: sts.Profile = sts.PROFILES["sts3215"]):
@@ -113,6 +140,10 @@ class Bench:
             print(f"  Датчик тока отвечает: масштаб уточнён — {self.lsb * 1000:.2f} мА на единицу.")
         else:
             print("  В регистре тока нули — датчика тока нет (как в даташите). Ток оцениваю по нагрузке привода.")
+        self._save_lsb()
+
+    def _save_lsb(self) -> None:
+        """Записать масштаб тока этого привода в файл калибровки, не трогая записи других приводов."""
         d = {}
         if CALIB_FILE.exists():
             try:
@@ -142,28 +173,21 @@ class Bench:
     def scan(self) -> list[int]:
         print("Ищу приводы на шине (1–253)…")
         found = [i for i in range(1, 254) if self.bus.ping(i)]
+        models = {i: self._model(i) for i in found}
         for i in found:
-            try:
-                model = self.servo(i).model()
-            except sts.BusError:
-                model = -1
-            short = self.p.title.split()[0]
-            if self.p.model is None:
-                name = f"{short}? модель {model} — номер запишется в отчёт"
-            elif model == self.p.model:
-                name = short
-            else:
-                name = f"модель {model} — НЕ {short}! Проверь привод и режим стенда"
-            print(f"  привод №{i}: {name}")
+            print(f"  привод №{i}: {model_label(self.p, models[i])}")
         if not found:
-            if self.p.key == "sts3215":
-                print("  Никого. Проверь питание 12 В, кабель и что красный провод от адаптера отключён (см. README).")
-            else:
-                print("  Никого. Проверь: 6,0 В на клеммах адаптера, переходник 1,25 → 5264 в разъёме TTL (3 контакта), USB.")
-        models = sorted({self.servo(i).model() for i in found}) if found else []
+            print(EMPTY_BUS_HINT[self.p.key])
         self.add("1", "Связь: найдено приводов", str(len(found)), "все подключённые", bool(found),
-                 "номера: " + ", ".join(map(str, found)) + ("; модель в регистре: " + ", ".join(map(str, models)) if models else ""))
+                 scan_note(found, sorted(set(models.values()))))
         return found
+
+    def _model(self, sid: int) -> int:
+        """Номер модели из регистра; привод не ответил — −1 (а не падение всего поиска)."""
+        try:
+            return self.servo(sid).model()
+        except sts.BusError:
+            return -1
 
     def assign_id(self) -> None:
         print("Назначение номера. На шине должен быть ОДИН привод (у новых у всех номер 1).")
@@ -190,36 +214,45 @@ class Bench:
         s.move(start)
         s.torque(True)
         self.sleep(1.0)
-        idle = statistics.median(self.amps(s.state()) for _ in range(20))
-        norm = f"≤ {str(self.p.idle_max_a).replace('.', ',')} А"
-        if not self.current_ok:
-            psu = self.ask_float("  Датчика тока у привода нет. Сколько ампер показывает блок питания (на шине один привод)?",
-                                 round(idle, 3))
-            idle = psu if psu is not None else idle
-        self.add("2а", "Ток покоя (удержание без нагрузки)", f"{idle:.3f} А", norm, idle <= self.p.idle_max_a,
-                 f"паспорт {self.p.idle_a * 1000:.0f} мА")
+        self._idle_current(s)
         if self.p.key != "sts3215":
             s.torque(False)
             print("  Ток в упоре у мини меряем на собранной ноге: пункт «Нога: момент бедра».")
             return
+        self._stall_current(sid, s, start)
+
+    def _idle_current(self, s: sts.Servo) -> None:
+        """Ток удержания без нагрузки: медиана 20 чтений, а без датчика тока — показание блока питания."""
+        idle = statistics.median(self.amps(s.state()) for _ in range(20))
+        if not self.current_ok:
+            psu = self.ask_float("  Датчика тока у привода нет. Сколько ампер показывает блок питания (на шине один привод)?",
+                                 round(idle, 3))
+            idle = psu if psu is not None else idle
+        self.add("2а", "Ток покоя (удержание без нагрузки)", f"{idle:.3f} А", f"≤ {str(self.p.idle_max_a).replace('.', ',')} А",
+                 idle <= self.p.idle_max_a, f"паспорт {self.p.idle_a * 1000:.0f} мА")
+
+    def _stall_current(self, sid: int, s: sts.Servo, start: int) -> None:
+        """Ток в упоре (STS3215): рычаг давит в преграду 1,5 с; по блоку питания уточняется масштаб тока."""
         self.wait_enter("  Упор: поставь рычаг так, чтобы при повороте ПО ЧАСОВОЙ он упёрся в неподвижную преграду.")
-        if isinstance(getattr(self.bus, "servos", None), dict):
-            self.bus.servos[sid].block_at = start + 120           # имитация преграды
+        self._sim_block(sid, start + 120)                          # имитация преграды
         cur = self.push(s, start + 400, 1.5)
         s.move(start, speed=800, accel=20)
         self.sleep(1.0)
         s.torque(False)
-        if isinstance(getattr(self.bus, "servos", None), dict):
-            self.bus.servos[sid].block_at = None
+        self._sim_block(sid, None)
         psu = self.ask_float("  Сколько ампер показывал блок питания во время упора? («-» — не смотрел)", round(cur, 2))
-        if psu and cur > 0.5:
-            self.lsb *= psu / cur
-            CALIB_FILE.write_text(json.dumps({"current_lsb_a": self.lsb}, ensure_ascii=False), encoding="utf-8")
+        new = scaled_lsb(self.lsb, psu, cur)
+        note = "масштаб тока по умолчанию"
+        if new is not None:
+            self.lsb, cur = new, psu
+            self._save_lsb()
             note = f"масштаб тока уточнён по блоку питания: {self.lsb * 1000:.2f} мА на единицу"
-            cur = psu
-        else:
-            note = "масштаб тока по умолчанию"
         self.add("2б", "Ток в упоре", f"{cur:.2f} А", "2,4–3,0 А", 2.4 <= cur <= 3.0, note)
+
+    def _sim_block(self, sid: int, at: int | None) -> None:
+        """Только для имитации (--sim): неподвижная преграда для рычага. На настоящей шине ничего не делает."""
+        if isinstance(getattr(self.bus, "servos", None), dict):
+            self.bus.servos[sid].block_at = at
 
     def push(self, s: sts.Servo, goal: int, seconds: float) -> float:
         """Давит в упор не дольше seconds (максимум 2 с). Возвращает медианный ток последней секунды."""

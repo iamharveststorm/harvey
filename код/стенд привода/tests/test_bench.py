@@ -397,3 +397,67 @@ def test_heat_case_default_is_sensor_minus_three(big):
     measured = result(big, "7")["measured"]
     sensor = int(measured.split("датчик ")[1].split()[0])
     assert f"корпус {float(sensor - 3)} °C" in measured
+
+
+# ---------- поиск приводов и масштаб тока: чистые функции ----------
+@pytest.mark.parametrize("key, model, label", [
+    ("sts3215", sts.MODEL_STS3215, "STS3215-C018"),
+    ("sts3215", 1234, "модель 1234 — НЕ STS3215-C018! Проверь привод и режим стенда"),
+    ("sts3032", 2312, "STS3032-C036? модель 2312 — номер запишется в отчёт"),
+])
+def test_model_label(key, model, label):
+    from harvey_bench.bench import model_label
+
+    assert model_label(sts.PROFILES[key], model) == label
+
+
+@pytest.mark.parametrize("found, models, note", [
+    ([1, 2], [777], "номера: 1, 2; модель в регистре: 777"),
+    ([], [], "номера: "),
+])
+def test_scan_note(found, models, note):
+    from harvey_bench.bench import scan_note
+
+    assert scan_note(found, models) == note
+
+
+@pytest.mark.parametrize("psu, cur, lsb", [(2.6, 2.0, 0.0065 * 1.3), (None, 2.0, None), (0.0, 2.0, None), (2.6, 0.5, None)])
+def test_scaled_lsb_only_with_real_stall(psu, cur, lsb):
+    from harvey_bench.bench import scaled_lsb
+
+    got = scaled_lsb(0.0065, psu, cur)
+    assert got == (pytest.approx(lsb) if lsb is not None else None)
+
+
+def test_scan_survives_a_servo_that_does_not_answer_model(big, monkeypatch):
+    def no_answer(self):
+        raise sts.BusError("привод 1 не ответил")
+
+    monkeypatch.setattr(sts.Servo, "model", no_answer)
+    assert big.scan() == [1]
+    r = result(big, "1")
+    assert r["verdict"] == "ОК" and r["note"] == "номера: 1; модель в регистре: -1"
+
+
+def test_stall_rescale_keeps_mini_calibration_in_the_file(big):
+    CALIB_FILE.write_text(json.dumps({"sts3032": 0.009, "sts3032_sensor": True}), encoding="utf-8")
+    answer(big, {"во время упора": "2.6"})
+    big.current_test(1)
+    d = json.loads(CALIB_FILE.read_text(encoding="utf-8"))
+    assert d["sts3032"] == 0.009 and d["sts3032_sensor"] is True                 # калибровка мини не стёрта
+    assert d["sts3215"] == d["current_lsb_a"] == big.lsb and d["sts3215_sensor"] is True
+    assert make("sts3215").lsb == big.lsb                                          # и прочитается при следующем запуске
+
+
+@pytest.mark.parametrize("raw", [0.03, 0.05])
+def test_tiny_register_current_means_no_sensor(mini, raw):
+    mini.calibrate_current(raw_a=raw, real_a=1.2)
+    assert mini.current_ok is False and mini.lsb == sts.CURRENT_LSB_A
+    assert json.loads(CALIB_FILE.read_text(encoding="utf-8"))["sts3032_sensor"] is False
+
+
+def test_stall_note_shows_new_scale_in_milliamps(big):
+    answer(big, {"во время упора": "2.6"})
+    big.current_test(1)
+    assert result(big, "2б")["note"] == f"масштаб тока уточнён по блоку питания: {big.lsb * 1000:.2f} мА на единицу"
+    assert 6.0 < big.lsb * 1000 < 7.0                                 # 6,5 мА по умолчанию × 2,6 / ≈ 2,7
