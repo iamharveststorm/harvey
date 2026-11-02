@@ -1,0 +1,116 @@
+metadata:
+  title: 'Харви «Компакт мини» — станция: питание и маяк'
+options:
+  fontname: Arial
+  bgcolor: WH
+  bgcolor_node: WH
+  bgcolor_connector: WH
+  bgcolor_cable: WH
+  color_mode: full
+  mini_bom_mode: false
+connectors:
+  PSU:
+    type: Блок питания USB-C
+    subtype: 5 В 3 А (15 Вт) — тот же, что у телефона
+    pinlabels:
+    - VBUS 5 В
+    - GND
+  USB:
+    type: Плата-разъём USB-C (приёмник)
+    subtype: резисторы 5,1 кОм на CC1 и CC2 — без них адаптер не даст 5 В
+    pinlabels:
+    - VBUS
+    - GND
+    notes: в отсеке башенки, разъём — в окне крышки dock_cover
+  F:
+    type: Самовосстанавливающийся предохранитель
+    subtype: 'PTC 3 А (удержание) — контакты открыты: монета, скрепка'
+    pinlabels:
+    - '1'
+    - '2'
+  POGO:
+    type: Pogo-контакты Ø5, ход 1,5 мм
+    subtype: 3–5 А · в гнёздах площадки dock_pad
+    pinlabels:
+    - +5 В (y = +16)
+    - GND (y = −16)
+    notes: Харви опускает корпус на 13 мм — пластины брюха ложатся на контакты
+  BCN:
+    type: Плата маяка NE556
+    subtype: 'лист beacon: пачки 38 кГц, ИК-светодиод TSAL6200'
+    pinlabels:
+    - +5 В
+    - GND
+    notes: ~40 мА в среднем
+cables:
+  W_PSU:
+    wirecount: 2
+    length: 1.5
+    colors:
+    - BK
+    - BK
+    notes: кабель USB-C от блока питания
+  W_F:
+    wirecount: 2
+    length: 0.05
+    colors:
+    - RD
+    - BK
+    notes: до 3 А
+    gauge: 20 AWG
+  W_POGO:
+    wirecount: 2
+    length: 0.15
+    colors:
+    - RD
+    - BK
+    notes: до 3 А · по каналам площадки и перемычке в отсек
+    gauge: 20 AWG
+  W_BCN:
+    wirecount: 2
+    length: 0.05
+    colors:
+    - RD
+    - BK
+    notes: ≈ 40 мА
+    gauge: 26 AWG
+connections:
+- - PSU:
+    - 1
+    - 2
+  - W_PSU:
+    - 1
+    - 2
+  - USB:
+    - 1
+    - 2
+- - USB:
+    - 1
+  - W_F:
+    - 1
+  - F:
+    - 1
+- - F:
+    - 2
+  - W_POGO:
+    - 1
+  - POGO:
+    - 1
+- - USB:
+    - 2
+  - W_POGO:
+    - 2
+  - POGO:
+    - 2
+- - F:
+    - 2
+  - W_BCN:
+    - 1
+  - BCN:
+    - 1
+- - USB:
+    - 2
+  - W_F:
+    - 2
+  - BCN:
+    - 2

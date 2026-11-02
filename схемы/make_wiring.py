@@ -310,12 +310,114 @@ def rp_sheet():
     w["W_ALERT"] = {"wirecount": 1, "gauge": "30 AWG", "length": 0.10, "colors": ["WH"], "notes": "низкий заряд / перегрузка → прерывание"}
     x.append([{"RP": [idx["GP27"]]}, {"W_ALERT": [1]}, {"INA": [1]}])
     for k, (nm, g) in enumerate((("слева", "GP14"), ("справа", "GP15")), 1):
-        c[f"IR{k}"] = {"type": f"ИК-приёмник {nm}: TSOP38238", "subtype": "38 кГц · в передней стенке у камеры",
+        c[f"IR{k}"] = {"type": f"ИК-приёмник {nm}: TSOP38238", "subtype": "38 кГц · на передней стенке по бокам камеры, развёрнут наружу на 30°",
                        "pinlabels": ["VS 3,3 В", "GND", "OUT"], "notes": "найти станцию без ПК: сравнить сигнал слева и справа"}
         w[f"W_IR{k}"] = {"wirecount": 3, "gauge": "30 AWG", "length": 0.08, "colors": ["OG", "BK", "GN"], "notes": "~0,4 мА"}
         x.append([{"RP": [idx["3V3 (выход)"], idx["GND"], idx[g]]}, {f"W_IR{k}": [1, 2, 3]}, {f"IR{k}": [1, 2, 3]}])
     return {"metadata": {"title": "Харви «Компакт мини» — RP2350: датчики"}, "options": OPT,
             "connectors": c, "cables": w, "connections": x}
+
+
+# ------------------------------------------------------------------ станция: проводка и маяк
+def station_sheet():
+    """Станция-«гнездо»: USB-C 5 В 3 А → предохранитель → контакты pogo и плата маяка. «+» — слева, если стоять
+    за башенкой лицом к площадке так же, как Харви (BELLY_Y в модели: +16 мм — «+»)."""
+    c, w, x = {}, {}, []
+    c["PSU"] = {"type": "Блок питания USB-C", "subtype": "5 В 3 А (15 Вт) — тот же, что у телефона", "pinlabels": ["VBUS 5 В", "GND"]}
+    c["USB"] = {"type": "Плата-разъём USB-C (приёмник)", "subtype": "резисторы 5,1 кОм на CC1 и CC2 — без них адаптер не даст 5 В",
+                "pinlabels": ["VBUS", "GND"], "notes": "в отсеке башенки, разъём — в окне крышки dock_cover"}
+    c["F"] = {"type": "Самовосстанавливающийся предохранитель", "subtype": "PTC 3 А (удержание) — контакты открыты: монета, скрепка",
+              "pinlabels": ["1", "2"]}
+    c["POGO"] = {"type": "Pogo-контакты Ø5, ход 1,5 мм", "subtype": "3–5 А · в гнёздах площадки dock_pad", "pinlabels": ["+5 В (y = +16)", "GND (y = −16)"],
+                 "notes": "Харви опускает корпус на 13 мм — пластины брюха ложатся на контакты"}
+    c["BCN"] = {"type": "Плата маяка NE556", "subtype": "лист beacon: пачки 38 кГц, ИК-светодиод TSAL6200", "pinlabels": ["+5 В", "GND"],
+                "notes": "~40 мА в среднем"}
+    for name, n, gauge, length, colors, note in (
+            ("W_PSU", 2, None, 1.5, ["BK", "BK"], "кабель USB-C от блока питания"),
+            ("W_F", 2, "20 AWG", 0.05, ["RD", "BK"], "до 3 А"),
+            ("W_POGO", 2, "20 AWG", 0.15, ["RD", "BK"], "до 3 А · по каналам площадки и перемычке в отсек"),
+            ("W_BCN", 2, "26 AWG", 0.05, ["RD", "BK"], "≈ 40 мА")):
+        w[name] = {"wirecount": n, "length": length, "colors": colors, "notes": note}
+        if gauge:
+            w[name]["gauge"] = gauge
+    x += [[{"PSU": [1, 2]}, {"W_PSU": [1, 2]}, {"USB": [1, 2]}],
+          [{"USB": [1]}, {"W_F": [1]}, {"F": [1]}],
+          [{"F": [2]}, {"W_POGO": [1]}, {"POGO": [1]}],
+          [{"USB": [2]}, {"W_POGO": [2]}, {"POGO": [2]}],
+          [{"F": [2]}, {"W_BCN": [1]}, {"BCN": [1]}],
+          [{"USB": [2]}, {"W_F": [2]}, {"BCN": [2]}]]
+    return {"metadata": {"title": "Харви «Компакт мини» — станция: питание и маяк"}, "options": OPT,
+            "connectors": c, "cables": w, "connections": x}
+
+
+def beacon():
+    """Маяк на NE556 (документы/NE556 — даташит TI.pdf): таймер 1 — пачки ~500 в секунду (вкл 1,40 мс, выкл 0,57 мс),
+    таймер 2 — несущая 38 кГц, работает, пока выход таймера 1 держит его RESET в 1. tH = 0,693 (RA + RB) C,
+    tL = 0,693 RB C, f = 1,44 / ((RA + 2 RB) C). TSOP382 (даташит Vishay) требует пачки ≥ 10 периодов и паузы ≥ 12:
+    здесь 53 и 22. Ток TSAL6200 — 105 мА в импульсе, 37 мА в среднем (предел 100 мА)."""
+    import schemdraw
+    import schemdraw.elements as elm
+    schemdraw.use("matplotlib")
+    schemdraw.config(font="Arial", fontsize=11)
+    d = schemdraw.Drawing(show=False)
+    side = lambda s, names: [elm.IcPin(name=n, pin=p, side=s, slot=f"{k}/6") for k, (n, p) in enumerate(names, 1)]
+    pins = side("left", [("TRIG1", "6"), ("THRES1", "2"), ("DISCH1", "1"), ("CONT1", "3"), ("RESET1", "4"), ("OUT1", "5")]) + \
+        side("right", [("TRIG2", "8"), ("THRES2", "12"), ("DISCH2", "13"), ("CONT2", "11"), ("RESET2", "10"), ("OUT2", "9")]) + \
+        [elm.IcPin(name="VCC", pin="14", side="top"), elm.IcPin(name="GND", pin="7", side="bot")]
+    tag = lambda at, text, loc: elm.Dot(open=True).at(at).label(text, loc)
+    with d:
+        u = elm.Ic(pins=pins, size=(4.0, 12.0), pinspacing=2.0, edgepadH=1.0).label("NE556", "center")
+        d += u
+        d += elm.Line().up(0.6).at(u.VCC); d += elm.Vdd().label("+5 В")
+        d += elm.Line().down(0.6).at(u.GND); d += elm.Ground()
+        for n, (dx, loc) in (("1", (-1, "left")), ("2", (1, "right"))):
+            pin = lambda name: getattr(u, name + n)
+            x = pin("DISCH")[0] + dx * 1.0
+            d += elm.Line().at(pin("OUT")).to((pin("OUT")[0] + dx * 1.0, pin("OUT")[1]))
+            d += elm.Line().at(pin("RESET")).to((x, pin("RESET")[1]))
+            d += elm.Line().at(pin("CONT")).to((x, pin("CONT")[1]))
+            d += elm.Capacitor().at((x, pin("CONT")[1])).to((x + dx * 2.0, pin("CONT")[1])).label("C3 10 нФ" if n == "1" else "C4 10 нФ", "top")
+            d += elm.Ground()
+            d += elm.Line().at(pin("DISCH")).to((x, pin("DISCH")[1])); d += elm.Dot()
+            d += elm.Resistor().at((x, pin("DISCH")[1])).to((x + dx * 3.0, pin("DISCH")[1])).label(
+                "RA1 12 кОм" if n == "1" else "RA2 1 кОм", "top")
+            d += tag(d.here, "+5 В", loc)
+            if n == "1":
+                d += elm.Resistor().at((x, pin("DISCH")[1])).to((x, pin("THRES")[1])).label("RB1\n8,2 кОм", "top")
+            else:
+                mid = (x, (pin("DISCH")[1] + pin("THRES")[1]) / 2)
+                d += elm.Resistor().at((x, pin("DISCH")[1])).to(mid).label("RB2\n15 кОм", "bottom")
+                d += elm.Potentiometer().at(mid).to((x, pin("THRES")[1])).label("RV 5 кОм\n→ 38 кГц", "bottom")
+            d += elm.Dot().at((x, pin("THRES")[1])); d += elm.Line().at((x, pin("THRES")[1])).to(pin("THRES"))
+            d += elm.Line().at((x, pin("THRES")[1])).to((x, pin("TRIG")[1])); d += elm.Dot()
+            d += elm.Line().at((x, pin("TRIG")[1])).to(pin("TRIG"))
+            d += elm.Capacitor().at((x, pin("TRIG")[1])).down(2.0).label("C1\n100 нФ" if n == "1" else "C2\n1 нФ",
+                                                                         "top" if dx < 0 else "bottom")
+            d += elm.Ground()
+        d += tag((u.OUT1[0] - 1.0, u.OUT1[1]), "OUT1 → RESET2 (10)", "left")
+        d += tag((u.RESET1[0] - 1.0, u.RESET1[1]), "+5 В", "left")
+        d += tag((u.RESET2[0] + 1.0, u.RESET2[1]), "← OUT1 (5)", "right")
+        # ---- выход: транзистор и ИК-светодиод
+        d += elm.Line().at((u.OUT2[0] + 1.0, u.OUT2[1])).right(4.0)
+        d += elm.Resistor().right(2.5).label("R1 1 кОм", "top")
+        q = elm.BjtNpn(circle=True).right().anchor("base").label("Q1\nBC337", "right")
+        d += q
+        d += elm.Line().down(1.0).at(q.emitter); d += elm.Ground()
+        d += elm.Line().up(0.4).at(q.collector)
+        d += elm.LED().up(2.0).reverse().label("D1 TSAL6200\n940 нм, ±17°", "bottom")
+        d += elm.Resistor().up(2.0).label("R2 33 Ом\n0,5 Вт", "bottom")
+        d += elm.Vdd().label("+5 В")
+        # ---- развязка питания у выводов 14 и 7
+        bx, by = u.GND[0] + 9.0, u.GND[1] + 1.0
+        d += elm.Capacitor().at((bx, by)).down(1.6).label("C5\n100 нФ", "bottom"); d += elm.Ground()
+        d += elm.Capacitor(polar=True).at((bx + 3.0, by)).down(1.6).label("C6\n10 мкФ", "bottom"); d += elm.Ground()
+        d += elm.Line().at((bx, by)).to((bx + 3.0, by)); d += tag((bx, by), "+5 В у 14", "left")
+        d += elm.Label().at((u.GND[0] - 8.0, u.GND[1] - 4.5)).label(
+            "Пачки: вкл 0,693·(12 + 8,2) кОм·100 нФ = 1,40 мс · выкл 0,693·8,2 кОм·100 нФ = 0,57 мс → 508 в секунду\n"
+            "Несущая: 1,44 / ((1 + 2·RB) кОм · 1 нФ): RB = RB2 + RV = 15–20 кОм → 46–35 кГц; RV выставить на 38 кГц (≈ 18,5 кОм)\n"
+            "Пачка 53 периода, пауза 22 (TSOP382: ≥ 10 и ≥ 12) · светодиод 105 мА в импульсе, 37 мА в среднем (предел 100 мА)\n"
+            "ПРЕДВАРИТЕЛЬНО: Q1 — любой NPN ≥ 200 мА (BC337, 2N2222); частоту проверить на стенде по дальности приёма", "right")
+    return d
 
 
 def render(name, data):
@@ -338,3 +440,8 @@ if __name__ == "__main__":
     d.save(os.path.join(HERE, "bus_buffer.svg"))
     d.save(os.path.join(HERE, "bus_buffer.png"), dpi=150)
     print("готово: bus_buffer")
+    render("station", station_sheet())
+    d = beacon()
+    d.save(os.path.join(HERE, "beacon.svg"))
+    d.save(os.path.join(HERE, "beacon.png"), dpi=150)
+    print("готово: beacon")

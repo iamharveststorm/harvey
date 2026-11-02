@@ -1,0 +1,9 @@
+Id	Description	Qty	Unit	Designators
+1	Cable, 2 wires	1.5	m	W_PSU
+2	Cable, 2 x 20 AWG	0.2	m	W_F, W_POGO
+3	Cable, 2 x 26 AWG	0.05	m	W_BCN
+4	Connector, Pogo-контакты Ø5, ход 1,5 мм, 3–5 А · в гнёздах площадки dock_pad, 2 pins	1		POGO
+5	Connector, Блок питания USB-C, 5 В 3 А (15 Вт) — тот же, что у телефона, 2 pins	1		PSU
+6	Connector, Плата маяка NE556, лист beacon: пачки 38 кГц, ИК-светодиод TSAL6200, 2 pins	1		BCN
+7	Connector, Плата-разъём USB-C (приёмник), резисторы 5,1 кОм на CC1 и CC2 — без них адаптер не даст 5 В, 2 pins	1		USB
+8	Connector, Самовосстанавливающийся предохранитель, PTC 3 А (удержание) — контакты открыты: монета, скрепка, 2 pins	1		F

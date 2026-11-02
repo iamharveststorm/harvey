@@ -347,6 +347,27 @@ def edge_sensors():
     return out
 
 
+# ИК-приёмники маяка TSOP38238 (документы/TSOP382 — даташит Vishay.pdf: корпус 5,0 × 6,95 × 4,8 мм, приём ±45°)
+# снаружи передней стенки по бокам от камеры, развёрнуты наружу на ±30°: прямо по курсу маяк видят оба, сбоку — один.
+IR_Y, IR_Z, IR_SPLAY, IR_HALF = 22.0, -6.0, 30.0, 45.0     # низко у дна: выше их задевает клешня, сложенная внутрь
+
+
+def ir_receivers():
+    x1 = G["body"][1]
+    out = []
+    for sg in (1, -1):
+        m = boxr(0, 4.8, -2.5, 2.5, -3.475, 3.475).rotate([0, 0, sg * IR_SPLAY]).translate([x1 + 2.0, sg * IR_Y, IR_Z])   # 2 мм от стенки: развёрнутый корпус не врезается в неё
+        out.append(m)
+    return out
+
+
+def ir_axis(sg):
+    """(точка — середина линзы, направление приёма) приёмника слева (sg = 1) или справа (−1), в системе корпуса."""
+    a = math.radians(sg * IR_SPLAY)
+    x1 = G["body"][1]
+    return (x1 + 2.0 + 4.8 * math.cos(a), sg * IR_Y + 4.8 * math.sin(a), IR_Z), (math.cos(a), math.sin(a), 0.0)
+
+
 BELLY_Y = (16.0, -16.0)          # середины контактных пластин на дне
 LID_SCREWS = ((-46.0, 0.0), (-20.0, 40.5), (-20.0, -40.5), (49.0, 0.0))   # винты крышки M2 во вставки ванны — там, где нет приводов
 DOCK_H = 4.0                     # высота площадки станции
@@ -370,16 +391,38 @@ def dock_pogo():
     return [cyl(POGO_TOP - 0.5, 2.5, 0, y, 0.5 + (POGO_TOP - 0.5) / 2) for y in BELLY_Y]
 
 
+DOCK_X0 = 140.0                              # передняя стенка башенки: поджатые клешни (привод захвата до 131 мм) не достают
+DOCK_LED = (DOCK_X0 + 4, 0.0, 49.0)          # ИК-светодиод маяка в стенке
+BAY = (DOCK_X0 + 8, DOCK_X0 + 28, -26.0, 26.0, 0.0, 52.0)   # отсек электроники позади стенки: плата USB-C и маяк NE556
+
+
 @functools.lru_cache(None)
 def dock_tower():
     """Башенка станции позади площадки: метка AprilTag 30 × 30 мм (её ищет камера), ИК-светодиод маяка
-    (его видит приёмник без ПК), разъём питания сзади. Харви заходит лицом к башенке: метка — на уровне камеры."""
-    x0 = 140.0                                   # впереди: поджатые клешни (привод захвата торчит вперёд до 131 мм) не достают
-    body = boxr(x0, x0 + 8, -30, 30, 0, 52) + boxr(x0 - 2, x0 + 20, -32, 32, 0, 3) + boxr(32, x0, -8, 8, 0, 2.0)   # перемычка с проводами
+    (его видят приёмники без ПК), сзади — отсек электроники (USB-C 5 В и маяк), закрытый крышкой dock_cover.
+    Харви заходит лицом к башенке: метка — на уровне камеры. Печать — основанием на стол, отсек открыт назад."""
+    x0 = DOCK_X0
+    bx0, bx1, by0, by1, bz0, bz1 = BAY
+    body = boxr(x0, x0 + 8, -30, 30, 0, 52) + boxr(x0 - 2, bx1, -32, 32, 0, 3) + boxr(32, x0, -8, 8, 0, 2.0)   # перемычка с проводами
+    body += boxr(bx0, bx1, by0, by1, bz0, bz1) - boxr(bx0 - 0.1, bx1 - 1.6, by0 + 1.6, by1 - 1.6, 3.0, bz1 - 1.6)
+    body -= boxr(bx1 - 1.6, bx1 + 0.1, by0 + 1.6, by1 - 1.6, 3.0, bz1 - 1.6)      # задняя стенка — крышка dock_cover
     body -= boxr(x0 - 0.5, x0 + 1.0, -16, 16, 14, 46)                           # окно метки
-    body -= cyl(12, 2.6, x0 + 4, 0, 49, "x")                                     # ИК-светодиод
-    body -= cyl(12, 4.0, x0 + 4, 0, 6, "x").translate([8, 0, 0])                 # разъём питания сзади
+    body -= cyl(12, 2.6, x0 + 4, 0, DOCK_LED[2], "x")                           # ИК-светодиод Ø5: выводы — в отсек
+    body -= boxr(x0 - 0.1, bx0 + 0.1, -5, 5, 3.0, 8.0)                          # проход проводов контактов в отсек
+    for y in (by0 + 5.0, by1 - 5.0):                                            # 2 винта M2 крышки: отверстие Ø1,6 под саморез
+        body -= cyl(8, 0.8, bx1 - 4.0, y, bz1 - 6.0, "x").translate([0, 0, 0])
     return body
+
+
+@functools.lru_cache(None)
+def dock_cover():
+    """Крышка отсека станции 1,6 мм: окно под разъём USB-C (9,5 × 3,8 мм) и 2 отверстия M2. Печать — плашмя."""
+    bx0, bx1, by0, by1, bz0, bz1 = BAY
+    m = boxr(bx1 - 1.6, bx1, by0 + 1.7, by1 - 1.7, 3.1, bz1 - 1.7)
+    m -= boxr(bx1 - 2, bx1 + 1, -4.75, 4.75, 8.0, 11.8)                          # USB-C
+    for y in (by0 + 5.0, by1 - 5.0):
+        m -= cyl(4, 1.1, bx1 - 0.8, y, bz1 - 6.0, "x")
+    return m
 
 
 @functools.lru_cache(None)
@@ -504,6 +547,7 @@ def fixed_parts():
     for s, m in eye_servos().items(): f[f"eye_servo_{s}"] = m
     for k, m in electronics().items(): f[k] = m
     for i, m in enumerate(edge_sensors()): f[f"edge_{i}"] = m
+    for s, m in zip("LR", ir_receivers()): f[f"ir_{s}"] = m
     return f
 
 
@@ -645,7 +689,7 @@ PRINTED = {   # деталь: (функция, сколько штук, мате
     "foot": (foot, 6, "TPU"), "yaw_bracket": (yaw_bracket, 2, "PLA"), "upper_arm": (upper_arm, 2, "PLA"),
     "forearm": (forearm, 2, "PLA"), "fixed_jaw": (lambda: fixed_jaw(1), 2, "PLA"), "moving_jaw": (lambda: moving_jaw(1), 2, "PLA"),
     "eye_stalk": (lambda: eye_stalk(1), 2, "PLA"), "chassis": (chassis, 1, "PLA"), "lid": (lid, 1, "PLA"),
-    "dock_pad": (dock_pad, 1, "PLA"), "dock_tower": (dock_tower, 1, "PLA"), "leg_stand": (leg_stand, 1, "PLA"),
+    "dock_pad": (dock_pad, 1, "PLA"), "dock_tower": (dock_tower, 1, "PLA"), "dock_cover": (dock_cover, 1, "PLA"), "leg_stand": (leg_stand, 1, "PLA"),
 }
 PARTS_G = {"STS3032 × 28": 28 * 20.0, "2 × 18650": 2 * 47.0, "Pi Zero 2 W": 11.0, "RP2350-Zero": 3.0, "DC-DC 6 В + 5 В": 18.0,
            "BMS + заряд 2S": 6.0, "IMU + INA226": 3.0, "камера Module 3 Wide": 4.0, "микрофоны + усилитель": 4.0, "динамик Ø20": 6.0,
@@ -666,7 +710,7 @@ def check_dock(verbose=True):
     ложатся на контакты, остальное не касается. Станция — в системе стола, Харви по центру, лицом к башенке."""
     z_stand = G["tib"] - G["fem"] * math.sin(math.radians(20))      # оси бедра над столом в стойке
     out = {}
-    pad = U([dock_pad(), dock_tower()] + dock_pogo())
+    pad = U([dock_pad(), dock_tower(), dock_cover()] + dock_pogo())
     for name, dz in (("стоя", 0.0), ("лёжа", REST_DROP)):
         zj = z_stand - dz
         robot = U([m.translate([0, 0, zj]) for m in fixed_parts().values()])
@@ -675,10 +719,37 @@ def check_dock(verbose=True):
             for parts in leg_assembly(n, 0, *leg_pose_for_drop(dz)).values():
                 legs += [m.translate([0, 0, zj]) for _, m in parts]
         claws = [m.translate([0, 0, zj]) for sd in "LR" for parts in claw_assembly(sd, *CLAW_TUCK).values() for _, m in parts]
-        out[name] = {"корпус × станция мм³": round(inter(robot, U([dock_pad(), dock_tower()])), 1),
+        out[name] = {"корпус × станция мм³": round(inter(robot, U([dock_pad(), dock_tower(), dock_cover()])), 1),
                      "ноги × станция мм³": round(inter(U(legs), pad), 1), "клешни × станция мм³": round(inter(U(claws), pad), 1),
                      "зазор брюхо — контакты мм": round(zj + G["body"][4] - POGO_TOP, 1)}
     if verbose: print("станция:", out)
+    return out
+
+
+def check_beacon(verbose=True):
+    """Маяк станции: видят ли приёмники светодиод при заходе — расстояние от передней стенки до башенки и сдвиг вбок.
+    Видит — светодиод в конусе приёма ±45° и луч не задевают поджатые клешни и сам корпус."""
+    zj = G["tib"] - G["fem"] * math.sin(math.radians(20))
+    claws = U([m for sd in "LR" for parts in claw_assembly(sd, *CLAW_TUCK).values() for _, m in parts])
+    robot = U([m for k, m in fixed_parts().items() if not k.startswith("ir_")] + [claws])
+    out = {}
+    for gap in (20.0, 100.0, 300.0):                       # от передней стенки корпуса до стенки башенки, мм
+        for dy in (0.0, 40.0, -40.0):
+            dx = DOCK_X0 - G["body"][1] - gap               # где стоит центр Харви в системе станции
+            seen = []
+            for sg in (1, -1):
+                p, ax = ir_axis(sg)
+                led = (DOCK_LED[0] - dx, DOCK_LED[1] - dy, DOCK_LED[2] - zj)  # светодиод в системе корпуса
+                v = [led[i] - p[i] for i in range(3)]
+                n = math.sqrt(sum(c * c for c in v))
+                ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(v[i] * ax[i] for i in range(3)) / n))))
+                start = [p[i] + v[i] / n * 6.0 for i in range(3)]          # луч от линзы, мимо своего корпуса
+                blocked = inter(rod(start, led, 0.8), robot) > 0.05
+                if ang <= IR_HALF and not blocked:
+                    seen.append("L" if sg > 0 else "R")
+            out[f"{gap:.0f} мм, вбок {dy:+.0f}"] = "".join(seen) or "—"
+    if verbose:
+        print("маяк:", out)
     return out
 
 
@@ -761,7 +832,7 @@ def export_sim(out):
         put(f"{s}_hand", "servo", [mir(grip_servo_hand())]); put(f"{s}_hand", "tpu", [mir(fixed_jaw(1))])
         put(f"{s}_jaw", "tpu", [mir(moving_jaw(1).translate([0, 0, 0]))])
         put(f"{s}_eye", "orange", [mir(eye_stalk(1))]); put(f"{s}_eye", "screen", [mir(display(1))])
-    for k, fn in (("dock_pad", dock_pad), ("dock_tower", dock_tower)):
+    for k, fn in (("dock_pad", dock_pad), ("dock_tower", dock_tower), ("dock_cover", dock_cover)):
         tm = to_tm(fn()); tm.vertices = tm.vertices / 1000.0; tm.export(os.path.join(out, f"{k}.stl")); man.setdefault("dock", []).append([f"{k}.stl", "grey"])
     json.dump({"bodies": man, "G": G, "GX": GX, "GY": GY, "masses": link_masses(), "belly_y": BELLY_Y, "dock_h": DOCK_H,
                "pogo_top": POGO_TOP, "rest_drop": REST_DROP},
@@ -775,7 +846,7 @@ if __name__ == "__main__":
     fast = "--fast" in sys.argv
     print(json.dumps(mass_report(), ensure_ascii=False, indent=1))
     hits = check(fast)
-    check_dock(); check_stand()
+    check_dock(); check_beacon(); check_stand()
     if not fast:
         print("STL:", export_stl())
         print("для симуляции:", export_sim(os.path.join(HERE, "..", "..", "код", "симуляция", "мини", "assets")))
