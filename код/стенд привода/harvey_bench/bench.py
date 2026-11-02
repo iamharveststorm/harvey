@@ -442,7 +442,72 @@ def measure_servo(bench: Bench) -> None:
         print("  Записано в servo_measurements.json — пришли файл или отчёт, поправлю CAD.")
 
 
-def main(argv=None) -> int:
+AUTO_COMPACT = ["1", "9", "0"]                               # --auto: что выбирает «человек» в меню
+AUTO_MINI = ["1", "4", "5", "6", "8", "9", "14", "0"]
+
+
+class Session:
+    """Что меню помнит между пунктами: номер привода для замеров одного привода."""
+
+    def __init__(self, bench: Bench):
+        self.bench, self.sid = bench, 1
+
+    def scan(self) -> None:
+        found = self.bench.scan()
+        if found:
+            self.sid = found[0]
+
+    def single(self, test):
+        """Пункт меню «один привод»: спросить номер (по умолчанию — прошлый) и выполнить замер."""
+
+        def run() -> None:
+            self.sid = int(self.bench.ask_float("Номер привода", self.sid) or self.sid)
+            test(self.sid)
+
+        return run
+
+
+def compact_actions(bench: Bench, session: Session, heat_min: float) -> dict:
+    heat = lambda sid: bench.heat_test(sid, heat_min)
+    singles = {"3": bench.current_test, "4": bench.torque_test, "5": bench.speed_test, "6": bench.backlash_test,
+               "7": bench.repeat_test, "8": heat}
+
+    def all_tests() -> None:
+        for test in (bench.current_test, bench.torque_test, bench.speed_test, bench.backlash_test, bench.repeat_test, heat):
+            test(session.sid)
+
+    return {"1": session.scan, "2": bench.assign_id, "9": all_tests,
+            **{key: session.single(test) for key, test in singles.items()}}
+
+
+def mini_actions(bench: Bench, session: Session, heat_min: float) -> dict:
+    from .leg import Leg
+
+    leg = Leg(bench)
+    gait = lambda: leg.gait(heat_min)
+
+    def whole_leg() -> None:
+        for test in (leg.poses, leg.stance_scale, leg.femur_torque, gait):
+            test()
+
+    singles = {"5": bench.current_test, "6": bench.speed_test, "7": bench.backlash_test, "8": bench.repeat_test}
+    return {"1": session.scan, "2": bench.assign_id, "3": leg.center_all, "4": lambda: measure_servo(bench),
+            "9": leg.calibrate, "10": leg.poses, "11": leg.stance_scale, "12": leg.femur_torque, "13": gait, "14": whole_leg,
+            **{key: session.single(test) for key, test in singles.items()}}
+
+
+def run_menu(bench: Bench, menu: str, actions: dict, choices: list[str] | None) -> int:
+    """Показывать меню, пока не выберут 0 (отчёт и выход). Неизвестный пункт — снова меню."""
+    while True:
+        print(menu)
+        ch = choices.pop(0) if choices else input("Выбор: ").strip()
+        if ch == "0":
+            bench.save()
+            return 0
+        actions.get(ch, lambda: None)()
+
+
+def parse_args(argv) -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Стенд привода Харви: STS3215 («Компакт») или STS3032 и нога («Компакт мини»)")
     ap.add_argument("--port", help="последовательный порт адаптера, например COM5 или /dev/ttyUSB0")
     ap.add_argument("--baud", type=int, default=1_000_000)
@@ -450,98 +515,54 @@ def main(argv=None) -> int:
     ap.add_argument("--sim", action="store_true", help="имитация без железа")
     ap.add_argument("--auto", action="store_true", help="ответы по умолчанию (для самопроверки)")
     ap.add_argument("--heat-min", type=float, default=10.0, help="длительность нагрева / шага на месте, мин")
-    args = ap.parse_args(argv)
-    profile = sts.PROFILES[args.servo]
-    mini = profile.key == "sts3032"
+    return ap.parse_args(argv)
 
+
+def open_bench(args: argparse.Namespace, profile: sts.Profile) -> Bench | None:
+    """Шина и стенд: имитация (--sim) или адаптер на порту. Без порта — подсказка и None."""
     if args.sim:
         from .fake import FakeBus, FakeLegBus
         from .leg import GEOM
 
         speed = 20.0 if args.auto else 1.0
-        bus = FakeLegBus(GEOM, speedup=speed) if mini else FakeBus(ids=(1,), speedup=speed, profile=profile)
-        bench = Bench(bus, auto=args.auto, speedup=bus.speedup, clock=bus.clock, profile=profile)
-    else:
-        if not args.port:
-            from serial.tools import list_ports
+        bus = FakeLegBus(GEOM, speedup=speed) if profile.key == "sts3032" else FakeBus(ids=(1,), speedup=speed, profile=profile)
+        return Bench(bus, auto=args.auto, speedup=bus.speedup, clock=bus.clock, profile=profile)
+    if not args.port:
+        from serial.tools import list_ports
 
-            ports = [p.device for p in list_ports.comports()]
-            print("Укажи порт: --port <имя>. Найдены порты:", ", ".join(ports) or "нет")
-            return 2
-        bus = sts.SerialBus(args.port, args.baud)
-        bench = Bench(bus, profile=profile)
+        ports = [p.device for p in list_ports.comports()]
+        print("Укажи порт: --port <имя>. Найдены порты:", ", ".join(ports) or "нет")
+        return None
+    return Bench(sts.SerialBus(args.port, args.baud), profile=profile)
 
-    sid = 1
+
+def release(bus) -> None:
+    """На выходе — отпустить все приводы и закрыть порт, что бы ни случилось."""
     try:
-        if mini:
-            from .leg import Leg
+        bus.write(sts.BROADCAST, sts.TORQUE_ENABLE, 0)
+    except Exception:
+        pass
+    bus.close()
 
-            leg = Leg(bench)
-            choices = ["1", "4", "5", "6", "8", "9", "14", "0"] if args.auto else None
-            while True:
-                print(MENU_MINI)
-                ch = choices.pop(0) if choices else input("Выбор: ").strip()
-                if ch == "1":
-                    found = bench.scan()
-                    if found:
-                        sid = found[0]
-                elif ch == "2":
-                    bench.assign_id()
-                elif ch == "3":
-                    leg.center_all()
-                elif ch == "4":
-                    measure_servo(bench)
-                elif ch in ("5", "6", "7", "8"):
-                    sid = int(bench.ask_float("Номер привода", sid) or sid)
-                    {"5": bench.current_test, "6": bench.speed_test, "7": bench.backlash_test, "8": bench.repeat_test}[ch](sid)
-                elif ch == "9":
-                    leg.calibrate()
-                elif ch == "10":
-                    leg.poses()
-                elif ch == "11":
-                    leg.stance_scale()
-                elif ch == "12":
-                    leg.femur_torque()
-                elif ch == "13":
-                    leg.gait(args.heat_min)
-                elif ch == "14":
-                    leg.poses()
-                    leg.stance_scale()
-                    leg.femur_torque()
-                    leg.gait(args.heat_min)
-                elif ch == "0":
-                    bench.save()
-                    return 0
-        choices = ["1", "9", "0"] if args.auto else None
-        while True:
-            print(MENU)
-            ch = choices.pop(0) if choices else input("Выбор: ").strip()
-            if ch == "1":
-                found = bench.scan()
-                if found:
-                    sid = found[0]
-            elif ch == "2":
-                bench.assign_id()
-            elif ch in "345678" and len(ch) == 1:
-                sid = int(bench.ask_float("Номер привода", sid) or sid)
-                {"3": bench.current_test, "4": bench.torque_test, "5": bench.speed_test, "6": bench.backlash_test,
-                 "7": bench.repeat_test}.get(ch, lambda i: bench.heat_test(i, args.heat_min))(sid)
-            elif ch == "9":
-                for fn in (bench.current_test, bench.torque_test, bench.speed_test, bench.backlash_test, bench.repeat_test):
-                    fn(sid)
-                bench.heat_test(sid, args.heat_min)
-            elif ch == "0":
-                bench.save()
-                return 0
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
+    profile = sts.PROFILES[args.servo]
+    bench = open_bench(args, profile)
+    if bench is None:
+        return 2
+    session = Session(bench)
+    try:
+        if profile.key == "sts3032":
+            menu, actions, auto = MENU_MINI, mini_actions(bench, session, args.heat_min), AUTO_MINI
+        else:
+            menu, actions, auto = MENU, compact_actions(bench, session, args.heat_min), AUTO_COMPACT
+        return run_menu(bench, menu, actions, list(auto) if args.auto else None)
     except KeyboardInterrupt:
         print("\nПрервано.")
         return 1
     finally:
-        try:
-            bus.write(sts.BROADCAST, sts.TORQUE_ENABLE, 0)     # на всякий случай: отпустить все приводы
-        except Exception:
-            pass
-        bus.close()
+        release(bench.bus)
 
 
 if __name__ == "__main__":
