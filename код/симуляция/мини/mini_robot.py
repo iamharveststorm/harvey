@@ -21,6 +21,9 @@ TABLE = (-0.30, 0.30, -0.30, 0.30)                 # столешница 60 × 
 TICK = 0.005                                       # проход главного цикла Spine ~5 мс (код/прошивка/rp2350/README.md)
 SUB = round(TICK / hm.DT)
 LIE_DZ = hm.CAD["rest_drop"] * hm.mm               # лечь: корпус ниже на 13 мм — пластины брюха на контакты
+# латунные пластины на брюхе 40 × 12 мм (модели/мини/harvey_mini_parts.py: x −20…20, y = BELLY_Y ± 6), контакт Ø5:
+# середина контакта должна быть не ближе 2,5 мм к краю пластины
+PLATE_X, PLATE_Y = 20 - 2.5, 6 - 2.5
 CFG = {"bat_low": pins.BAT_LOW_V, "bat_critical": pins.BAT_CRITICAL_V, "telemetry_ms": pins.TELEMETRY_MS,
        "edge_names": pins.EDGE_NAMES}
 
@@ -101,13 +104,21 @@ class SimRobot:
 
     # ---------- что видит голова кроме RP2350 ----------
     def vision(self):
-        return ms.see_hand(self.sim) if self.has_hand else None
+        """Что нашла бы камера: рука и метка станции (заглушка разбора кадра на ПК или голове)."""
+        return {"hand": ms.see_hand(self.sim) if self.has_hand else None,
+                "dock": ms.see_tag(self.sim, self.dock_pos) if self.dock_pos is not None else None}
 
     def charging(self):
+        """Оба контакта прижаты к брюху и каждый — под своей латунной пластиной (касание пластикового дна не заряжает)."""
         if self.dock_pos is None:
             return False
         m, d = self.sim.m, self.sim.d
-        return min(hm.contact_force(m, d, m.geom("body").id, m.geom(f"pogo{k}").id) for k in range(2)) > 0.3
+        for k, y in enumerate(hm.CAD["belly_y"]):
+            pogo = m.geom(f"pogo{k}").id
+            px, py, _ = self.sim.to_body(d.geom_xpos[pogo]) * 1000
+            if abs(px) > PLATE_X or abs(py - y) > PLATE_Y or hm.contact_force(m, d, m.geom("body").id, pogo) <= 0.3:
+                return False
+        return True
 
     # ---------- для проверок ----------
     def pose(self):

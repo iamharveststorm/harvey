@@ -238,3 +238,10 @@ def test_acceleration_rounded_to_milli_g():
     p["imu"].acc = (0.12345, 0.0, 0.98765)
     step(sp, clock, ms=60)
     assert p["port"].of("tel")[-1]["acc"] == [0.123, 0.0, 0.988]
+
+
+def test_rotation_rate_in_telemetry_for_turning_by_angle():
+    sp, p, _, clock = make()
+    p["imu"].gyr = (1.04, -2.0, 45.26)
+    step(sp, clock, ms=60)
+    assert p["port"].of("tel")[-1]["gyr"] == [1.0, -2.0, 45.3]

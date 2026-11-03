@@ -21,7 +21,7 @@ class Spine:
         self.events = ImuEvents()
         self.far = [False] * 6
         self.dist = [0] * 6
-        self.acc, self.tilt = (0.0, 0.0, 1.0), (0.0, 0.0)
+        self.acc, self.gyr, self.tilt = (0.0, 0.0, 1.0), (0.0, 0.0, 0.0), (0.0, 0.0)
         self.bat = (0.0, 0.0)
         self.bat_level, self.docked, self.relaxed, self.was_blocked, self.was_lifted = "unknown", False, False, False, False
         self.ir, self.beacon_dir = (0, 0), "none"
@@ -52,7 +52,7 @@ class Spine:
             return []
         acc, gyr = self.imu.read()
         new, self.tilt = self.events.update(acc, gyr, ticks_diff(now, self.t_imu))
-        self.acc, self.t_imu = acc, now
+        self.acc, self.gyr, self.t_imu = acc, gyr, now
         for name in new:
             self.event(name)
         if "fall" in new:
@@ -143,5 +143,6 @@ class Spine:
     def telemetry(self, now):
         return {"t": "tel", "ms": now, "edge": self.dist, "far": [int(f) for f in self.far],
                 "tilt": [round(a, 1) for a in self.tilt], "acc": [round(a, 3) for a in self.acc],
+                "gyr": [round(g, 1) for g in self.gyr],
                 "bat": [round(self.bat[0], 2), round(self.bat[1], 3)], "ir": list(self.ir), "beacon": self.beacon_dir,
                 "relaxed": int(self.relaxed)}

@@ -205,20 +205,53 @@ CAM = (0.0662, 0.0, 0.0085)                         # harvey_mini.CAMERA
 CAM_HALF_H, CAM_HALF_V, CAM_RANGE = math.radians(50), math.radians(33.5), 0.6
 
 
-def see_hand(sim, body="hand"):
-    """{"bearing_deg": + — слева, "dist_mm"} руки, если она в кадре, ближе 60 см и ничем не закрыта; иначе None."""
+def _in_frame(sim, target):
+    """Точка target (мир) в кадре камеры и ближе CAM_RANGE: (направление в кадре °, угол места °, расстояние м, камера)."""
     tb = sim.d.body("torso"); R = tb.xmat.reshape(3, 3)
     cam = tb.xpos + R @ np.array(CAM)
-    target = sim.d.body(body).xpos
-    rel = R.T @ (target - cam)
+    rel = R.T @ (np.asarray(target) - cam)
     r = float(np.linalg.norm(rel))
     bearing, elev = math.atan2(rel[1], rel[0]), math.atan2(rel[2], math.hypot(rel[0], rel[1]))
     if rel[0] <= 0 or abs(bearing) > CAM_HALF_H or abs(elev) > CAM_HALF_V or r > CAM_RANGE:
         return None
-    _, gid = _ray(sim, cam, (target - cam) / r, SOLID)
-    if gid < 0 or sim.m.geom_bodyid[gid] != sim.m.body(body).id:
+    return bearing, r, cam
+
+
+def _first_body(sim, cam, target, r):
+    _, gid = _ray(sim, cam, (np.asarray(target) - cam) / r, SOLID)
+    return sim.m.geom_bodyid[gid] if gid >= 0 else None
+
+
+def see_hand(sim, body="hand"):
+    """{"bearing_deg": + — слева, "dist_mm"} руки, если она в кадре, ближе 60 см и ничем не закрыта; иначе None."""
+    target = sim.d.body(body).xpos
+    seen = _in_frame(sim, target)
+    if seen is None or _first_body(sim, seen[2], target, seen[1]) != sim.m.body(body).id:
         return None
-    return {"bearing_deg": round(math.degrees(bearing), 1), "dist_mm": round(r * 1000)}
+    return {"bearing_deg": round(math.degrees(seen[0]), 1), "dist_mm": round(seen[1] * 1000)}
+
+
+# метка AprilTag 30 × 30 мм в окне башенки (CAD dock_tower: окно x 139,5…141, y ±16, z 14…46 от центра площадки);
+# смотрит по −x. Предварительно: читается, если камера видит её не круче 70° к нормали; точность позы не моделируется
+TAG = (0.140, 0.0, 0.030)
+TAG_MAX_ANGLE = math.radians(70)
+
+
+def see_tag(sim, dock_pos):
+    """{"x_mm", "y_mm", "yaw_deg"} — где корпус в системе станции (0 — над контактами, x — к башенке), если метка в кадре."""
+    target = np.array([dock_pos[0] + TAG[0], dock_pos[1] + TAG[1], TAG[2]])
+    seen = _in_frame(sim, target)
+    if seen is None:
+        return None
+    to_cam = seen[2] - target
+    if -to_cam[0] / np.linalg.norm(to_cam) < math.cos(TAG_MAX_ANGLE):
+        return None
+    if _first_body(sim, seen[2], target, seen[1]) not in (None, 0):          # 0 — мир: станция вкопана в мир
+        return None
+    tb = sim.d.body("torso"); q = tb.xquat
+    yaw = math.atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] ** 2 + q[3] ** 2))
+    return {"x_mm": round((tb.xpos[0] - dock_pos[0]) * 1000, 1), "y_mm": round((tb.xpos[1] - dock_pos[1]) * 1000, 1),
+            "yaw_deg": round(math.degrees(yaw), 1)}
 
 
 # ---------- мир ----------

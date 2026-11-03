@@ -141,3 +141,23 @@ def test_hand_behind_is_not_seen():
 
 def test_hand_outside_the_frame_is_not_seen():
     assert ms.see_hand(sim_at(hand=(0.10, 0.25))) is None
+
+
+# ---------- «зрение»: метка AprilTag на башенке ----------
+def test_tag_gives_the_body_pose_in_the_station_frame():
+    s = sim_at(DOCK[0] - 0.30, 0.04, 10.0, dock=DOCK)
+    v = ms.see_tag(s, DOCK)
+    x, y, _ = s.d.body("torso").xpos
+    assert v["x_mm"] == pytest.approx((x - DOCK[0]) * 1000, abs=0.5)
+    assert v["y_mm"] == pytest.approx(y * 1000, abs=0.5) and v["yaw_deg"] == pytest.approx(10.0, abs=0.5)
+
+
+def test_tag_is_not_seen_facing_away_or_from_behind_the_station():
+    assert ms.see_tag(sim_at(DOCK[0] - 0.30, 0.0, 180.0, dock=DOCK), DOCK) is None
+    assert ms.see_tag(sim_at(DOCK[0] + 0.30, 0.0, 180.0, dock=DOCK), DOCK) is None
+
+
+def test_tag_seen_too_obliquely_is_not_detected():
+    # 25 см сбоку от метки и чуть впереди: камера видит метку под ~75° к её нормали
+    s = sim_at(DOCK[0] + 0.07, -0.25, 80.0, dock=DOCK)
+    assert ms.see_tag(s, DOCK) is None

@@ -13,10 +13,14 @@ def tel(far=(0,) * 6, beacon="none", edge=(70, 70, 72, 72, 104, 104), tilt=(0.0,
 
 
 class Run:
-    """Гоняет поведение во времени; мир — функции от прошедшего времени и накопленного поворота."""
+    """Гоняет поведение во времени; мир — функции от прошедшего времени и накопленного поворота.
+    Корпус поворачивается ровно с заданной скоростью, гироскоп в телеметрии её и показывает."""
 
     def __init__(self, goal=None):
-        self.b, self.t, self.heading = Behavior(0.0), 0.0, 0.0
+        self.b, self.t, self.heading, self.wz = Behavior(0.0), 0.0, 0.0, 0.0
+        self.x, self.y, self.slip = 0.0, 0.0, 0.0       # мм в системе станции; slip — снос вбок, мм/с
+        self.gain, self.drift = 1.0, 0.0                 # поворачивается слабее команды / уводит сам
+        self.history = [0.0]
         self.cmds = []
         if goal:
             self.b.request(goal, 0.0)
@@ -24,10 +28,24 @@ class Run:
     def go(self, sec, telem=lambda r: tel(), events=lambda r: [], vision=lambda r: None):
         for _ in range(round(sec / DT)):
             self.t += DT
-            cmd = self.b.update(telem(self), events(self), vision(self), self.t)
-            self.heading += cmd["v"][2] * DT
+            rate = self.gain * self.wz + self.drift
+            self.heading += rate * DT
+            self.history.append(self.heading)
+            if self.cmds:
+                vx, vy, _ = self.cmds[-1]["v"]
+                c, s = math.cos(math.radians(self.heading)), math.sin(math.radians(self.heading))
+                self.x += (vx * c - vy * s) * DT
+                self.y += (vx * s + vy * c + self.slip) * DT
+            msg = dict(telem(self), gyr=[0.0, 0.0, rate])
+            cmd = self.b.update(msg, events(self), vision(self), self.t)
+            self.wz = cmd["v"][2]
             self.cmds.append(cmd)
         return self.cmds[-1]
+
+    def until(self, state, limit=30.0, **world):
+        while self.b.state != state and self.t < limit:
+            self.go(DT, **world)
+        return self.b.state
 
 
 def test_starts_idle_and_still():
@@ -38,39 +56,46 @@ def test_starts_idle_and_still():
 # ---------- осмотреться ----------
 def test_look_turns_a_full_circle_with_six_pauses_then_idles():
     r = Run("look")
-    r.go(16.0)
+    assert r.until("idle") == "idle" and r.t < 25
     assert r.heading == pytest.approx(360, abs=2) and r.b.state == "idle"
     turning = [c["v"][2] != 0 for c in r.cmds]
     pauses = sum(1 for a, b in zip(turning, turning[1:]) if a and not b)
     assert pauses == 6
 
 
+def test_look_turns_by_the_gyro_even_when_the_body_lags():
+    r = Run("look")
+    r.gain = 0.6
+    r.until("idle", limit=40.0)
+    assert r.heading == pytest.approx(360, abs=2)
+
+
 def test_look_switches_to_the_hand_when_it_comes_into_view():
     r = Run("look")
     r.go(1.0)
-    cmd = r.go(0.1, vision=lambda r: {"bearing_deg": 20.0, "dist_mm": 300})
+    cmd = r.go(0.1, vision=lambda r: {"hand": {"bearing_deg": 20.0, "dist_mm": 300}})
     assert cmd["state"] == "hand"
 
 
 # ---------- подойти к руке ----------
 def test_hand_far_off_to_the_side_turns_on_the_spot():
-    cmd = Run("hand").go(0.1, vision=lambda r: {"bearing_deg": -35.0, "dist_mm": 300})
+    cmd = Run("hand").go(0.1, vision=lambda r: {"hand": {"bearing_deg": -35.0, "dist_mm": 300}})
     assert cmd["v"][0] == 0 and cmd["v"][2] < 0
 
 
 def test_hand_ahead_walks_and_steers_toward_it():
-    cmd = Run("hand").go(0.1, vision=lambda r: {"bearing_deg": 5.0, "dist_mm": 300})
+    cmd = Run("hand").go(0.1, vision=lambda r: {"hand": {"bearing_deg": 5.0, "dist_mm": 300}})
     assert cmd["v"][0] > 0 and cmd["v"][2] > 0
 
 
 def test_hand_close_stops():
-    cmd = Run("hand").go(0.1, vision=lambda r: {"bearing_deg": 2.0, "dist_mm": 85})
+    cmd = Run("hand").go(0.1, vision=lambda r: {"hand": {"bearing_deg": 2.0, "dist_mm": 85}})
     assert cmd["v"] == (0, 0, 0) and cmd["state"] == "at_hand"
 
 
 def test_hand_lost_goes_back_to_looking_instead_of_walking_blind():
     r = Run("hand")
-    r.go(0.5, vision=lambda r: {"bearing_deg": 0.0, "dist_mm": 300})
+    r.go(0.5, vision=lambda r: {"hand": {"bearing_deg": 0.0, "dist_mm": 300}})
     cmd = r.go(0.3)
     assert cmd["v"] == (0, 0, 0)
     assert r.go(0.4)["state"] == "look"
@@ -84,9 +109,8 @@ def test_edge_ahead_backs_away_then_turns_round_then_resumes():
     assert cmd["state"] == "edge" and cmd["v"][0] < 0 and cmd["v"][2] == 0
     r.go(0.45)                                              # край ушёл из-под датчиков — ещё немного назад
     h0 = r.heading
-    r.go(4.0)
-    assert r.heading - h0 == pytest.approx(120, abs=5)
-    assert r.go(0.2)["state"] == "look"
+    assert r.until("look") == "look"
+    assert r.heading - h0 == pytest.approx(120, abs=3)
 
 
 def test_edge_behind_goes_forward():
@@ -121,10 +145,11 @@ def test_bat_low_goes_home():
 
 
 # ---------- домой по маяку ----------
-def beacon_at(target):
-    """Маяк виден обоими приёмниками в ±40° от курса, одним — до ±70°."""
+def beacon_at(target, lag=0.0):
+    """Маяк виден обоими приёмниками в ±40° от курса, одним — до ±70°; lag — сколько секунд опаздывает ответ."""
     def f(r):
-        b = (target - r.heading + 180) % 360 - 180
+        h = r.history[max(0, len(r.history) - 1 - round(lag / DT))]
+        b = (target - h + 180) % 360 - 180
         if abs(b) <= 40:
             return tel(beacon="ahead")
         if abs(b) <= 70:
@@ -145,10 +170,73 @@ def test_home_turns_to_face_the_beacon(target):
     assert (target - r.heading + 180) % 360 - 180 == pytest.approx(0, abs=4)
 
 
+@pytest.mark.parametrize("target", [-60, 0, 25, 170])
+def test_home_centering_cancels_the_beacon_delay(target):
+    r = Run("home")
+    world = beacon_at(target, lag=0.1)                     # RP2350 считает пачки окнами по 100 мс
+    assert r.until("home_approach", telem=world) == "home_approach"
+    assert (target - r.heading + 180) % 360 - 180 == pytest.approx(0, abs=1.2)
+
+
 def test_home_without_a_beacon_gives_up_after_a_full_circle():
     r = Run("home")
     r.go(14.0)
     assert r.b.state == "home_lost" and r.cmds[-1]["v"] == (0, 0, 0) and 330 < r.heading < 400
+
+
+def test_home_approach_holds_the_heading_against_drift():
+    r = Run("home")
+    approach(r)
+    h0 = r.heading
+    r.drift = 4.0
+    r.go(3.0, telem=lambda r: tel(beacon="ahead"))
+    assert r.heading == pytest.approx(h0, abs=3) and r.cmds[-1]["v"][2] < 0
+
+
+def tag(r):
+    """Камера видит метку на башенке: где корпус в системе станции."""
+    return {"dock": {"x_mm": r.x, "y_mm": r.y, "yaw_deg": r.heading}}
+
+
+def test_home_by_the_tag_lines_up_on_the_station_axis_first():
+    r = Run("home")
+    r.x, r.y, r.heading = -320.0, 70.0, 25.0
+    assert r.until("home_approach", vision=tag) == "home_approach"
+    assert r.x == pytest.approx(-250, abs=10) and abs(r.y) < 2.5 and abs(r.heading) < 1.5
+
+
+def test_home_approach_corrects_sideways_slip_by_the_tag():
+    r = Run("home")
+    r.x = -250.0
+    r.until("home_approach", vision=tag)
+    r.slip = 6.0
+    r.go(3.0, telem=lambda r: tel(beacon="ahead"), vision=tag)
+    assert abs(r.y) < 3 and r.cmds[-1]["v"][1] < 0
+
+
+def test_home_by_the_beacon_switches_to_the_tag_once_it_is_in_view():
+    r = Run("home")
+    r.go(0.2, telem=beacon_at(30))
+    assert r.b.state == "home_center"
+    r.go(0.1, telem=beacon_at(30), vision=tag)
+    assert r.b.state == "home_align"
+
+
+def test_home_approach_far_off_the_axis_lines_up_again():
+    r = Run("home")
+    approach(r)
+    r.x, r.y = -200.0, 40.0
+    r.go(0.1, telem=lambda r: tel(beacon="ahead"), vision=tag)
+    assert r.b.state == "home_align"
+
+
+def test_home_tag_lost_while_lining_up_searches_again():
+    r = Run("home")
+    r.x, r.y = -320.0, 70.0
+    r.go(0.5, vision=tag)
+    assert r.b.state == "home_align"
+    r.go(1.2)
+    assert r.b.state == "home_search"
 
 
 def pad_then_tower(r):

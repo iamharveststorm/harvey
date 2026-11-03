@@ -58,3 +58,12 @@ def test_charging_needs_the_belly_on_the_contacts():
     assert not r.charging()
     drive(r, (0, 0, 0), 1.5, pose="lie")
     assert r.charging()
+
+
+def test_charging_only_when_each_contact_is_under_its_brass_plate():
+    def lying(dy, dx=0.0):
+        r = mr.SimRobot(dock_pos=(0.0, 0.0), start=(dx, dy, 0.0))
+        drive(r, (0, 0, 0), 1.5, pose="lie")
+        return r.charging()
+    assert lying(0.002) and lying(0.0, 0.012)
+    assert not lying(0.008) and not lying(0.0, 0.025)
