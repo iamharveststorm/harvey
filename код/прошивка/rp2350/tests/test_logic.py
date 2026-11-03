@@ -56,6 +56,18 @@ def test_edge_array_calibrates_then_flags_the_drop():
     assert arr.flags() == [True, False, False, False, False, True]
 
 
+
+def test_baseline_ignores_objects_far_from_the_expected_table():
+    near_tower = [(39, 0), (40, 0), (39, 0)]
+    assert edge.baseline(near_tower, nominal=72, tol=15) == 72            # перед предметом — расчётное расстояние
+    assert edge.baseline([(70, 0), (39, 0), (71, 0)], nominal=72, tol=15) == 71
+
+
+def test_edge_array_calibration_in_front_of_an_object_keeps_the_table_distance():
+    i2c, pins, devs = six((40, 81, 79, 80, 70, 71))
+    arr = edge.EdgeArray(i2c, pins, NAMES, margin_mm=25, nominal=(80, 80, 80, 80, 70, 70))
+    assert arr.calibrate(rounds=3, wait_ms=0) == [80, 81, 79, 80, 70, 71]
+
 # ---------- IMU ----------
 def test_tilt():
     assert imu_events.tilt((0, 0, 1)) == pytest.approx((0, 0))

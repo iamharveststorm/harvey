@@ -48,7 +48,7 @@ def build():
              "B": sts_bus.Bus(uart_id=pins.BUS_B["uart"], tx=pins.BUS_B["tx"], rx=pins.BUS_B["rx"], baud=pins.BUS_BAUD),
              "C": sts_bus.Bus(uart=PioUart(pins.BUS_C["pio"], pins.BUS_C["tx"], pins.BUS_C["rx"], pins.BUS_BAUD))}
     edge = EdgeArray(i2c, [Pin(p, Pin.OUT) for p in pins.EDGE_XSHUT], pins.EDGE_NAMES, pins.EDGE_ADDR0,
-                     pins.EDGE_BUDGET_MS, pins.EDGE_MARGIN_MM)
+                     pins.EDGE_BUDGET_MS, pins.EDGE_MARGIN_MM, nominal=pins.EDGE_NOMINAL_MM)
 
     def imu():
         with open("bmi270_config.bin", "rb") as f:

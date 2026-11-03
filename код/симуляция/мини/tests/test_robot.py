@@ -67,3 +67,10 @@ def test_charging_only_when_each_contact_is_under_its_brass_plate():
         return r.charging()
     assert lying(0.002) and lying(0.0, 0.012)
     assert not lying(0.008) and not lying(0.0, 0.025)
+
+
+def test_switched_on_facing_an_object_does_not_take_the_table_for_an_edge():
+    r = mr.SimRobot(table=(-0.3, 0.6, -0.3, 0.3), dock_pos=(0.0, 0.0), start=(0.25, 0.0, 180.0))   # носом к башенке
+    assert r.spine.edge.base[:2] == [72, 72]                              # не 39 мм до стенки башенки
+    events = drive(r, (-30, 0, 0), 1.5)                                  # отойти от башенки: под носом снова стол
+    assert "edge" not in events and r.tel["far"] == [0] * 6

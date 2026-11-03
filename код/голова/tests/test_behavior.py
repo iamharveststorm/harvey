@@ -302,3 +302,89 @@ def test_turn_rate_is_gentle():
     r = Run("look")
     r.go(3.0)
     assert max(abs(c["v"][2]) for c in r.cmds) <= 45 and not math.isnan(r.heading)
+
+
+# ---------- точнее: паузы, ожидания, знаки ----------
+def test_look_pauses_a_second_before_each_turn():
+    r = Run("look")
+    r.go(0.95)
+    assert all(c["v"] == (0, 0, 0) for c in r.cmds)
+    r.go(0.2)
+    assert r.cmds[-1]["v"][2] > 0
+
+
+def test_hand_briefly_out_of_view_is_waited_for():
+    r = Run("hand")
+    r.go(0.5, vision=lambda r: {"hand": {"bearing_deg": 0.0, "dist_mm": 300}})
+    assert r.go(0.4)["state"] == "hand"
+
+
+def test_hand_moved_away_is_followed_again_but_small_moves_are_ignored():
+    r = Run("hand")
+    r.go(0.1, vision=lambda r: {"hand": {"bearing_deg": 0.0, "dist_mm": 85}})
+    assert r.go(0.1, vision=lambda r: {"hand": {"bearing_deg": 0.0, "dist_mm": 115}})["state"] == "at_hand"
+    assert r.go(0.1, vision=lambda r: {"hand": {"bearing_deg": 0.0, "dist_mm": 130}})["state"] == "hand"
+
+
+def test_hand_to_the_left_turns_left_on_the_spot():
+    cmd = Run("hand").go(0.1, vision=lambda r: {"hand": {"bearing_deg": 12.0, "dist_mm": 300}})
+    assert cmd["v"] == (0, 0, 30.0)
+
+
+def test_lifted_waits_for_a_whole_second_on_the_table():
+    r = Run("look")
+    r.go(0.1, telem=lambda r: tel(far=(1,) * 6), events=lambda r: ["lifted"])
+    r.go(0.5)
+    r.go(0.1, telem=lambda r: tel(far=(0, 0, 0, 0, 0, 1)))       # поставили неровно — снова считать с нуля
+    assert r.go(0.9)["state"] == "lifted"
+    assert r.go(0.2)["state"] == "look"
+
+
+def test_search_turns_on_the_spot():
+    assert Run("home").go(0.3)["v"] == (0, 0, 30.0)
+
+
+def test_tag_briefly_lost_while_lining_up_is_waited_for():
+    r = Run("home")
+    r.x, r.y = -320.0, 70.0
+    r.go(0.2, vision=tag)
+    assert r.go(0.8)["state"] == "home_align"
+
+
+def test_lining_up_steps_forward_and_sideways_toward_the_axis():
+    r = Run("home")
+    r.x, r.y = -320.0, 70.0
+    cmd = r.go(DT, vision=tag)
+    cmd = r.go(DT, vision=tag)
+    assert cmd["v"][0] == 40.0 and cmd["v"][1] == -30.0 and cmd["v"][2] == 0
+
+
+def test_lining_up_when_turned_converts_the_error_into_body_axes():
+    r = Run("home")
+    r.x, r.y, r.heading = -250.0, 20.0, 90.0                     # стоит на 20 мм левее оси, смотрит налево
+    r.go(DT, vision=tag)
+    vx, vy, wz = r.go(DT, vision=tag)["v"]
+    assert vx == pytest.approx(-30.0) and abs(vy) < 1e-9 and wz == -20.0   # ось — за спиной: назад и поворот направо
+
+
+def test_charging_current_alone_means_docked():
+    r = Run("home")
+    lie_down(r)
+    cmd = r.go(0.2, telem=lambda r: dict(tel(), bat=[7.4, -0.4]))
+    assert cmd["state"] == "docked"
+
+
+def test_search_counts_the_full_circle_from_where_it_started():
+    r = Run("look")
+    r.until("idle")                                          # курс уже 360°
+    r.b.request("home", r.t)
+    r.go(6.0)
+    assert r.b.state == "home_search"
+
+
+def test_home_approach_turns_back_onto_the_axis_by_the_tag():
+    r = Run("home")
+    r.x = -250.0
+    r.until("home_approach", vision=tag)
+    r.heading = 3.0
+    assert r.go(DT, telem=lambda r: tel(beacon="ahead"), vision=tag)["v"][2] < 0

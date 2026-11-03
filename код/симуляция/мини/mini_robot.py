@@ -65,7 +65,7 @@ class SimRobot:
         self.tel, self.events, self.lift_events = {}, [], []
         bus = ms.SimBus(self.sim)
         tof = edge.EdgeArray(None, [Pin() for _ in pins.EDGE_NAMES], pins.EDGE_NAMES, pins.EDGE_ADDR0,
-                             make=ms.tof_factory(self.sim))
+                             make=ms.tof_factory(self.sim), nominal=pins.EDGE_NOMINAL_MM)
         beacon = ms.SimBeacon(self.sim, ms.led_world(dock_pos)) if dock_pos is not None else None
         self.spine = Spine(self.port, {"A": bus, "B": bus, "C": bus}, edge=tof, imu=ms.SimImu(self.sim),
                            ina=ms.SimIna(self.charging), beacon=beacon, cfg=CFG, clock=lambda: round(self.t * 1000))
@@ -129,7 +129,7 @@ class SimRobot:
 
     def on_table(self):
         d = self.sim.d
-        return all(d.geom(f"{n}_foot").xpos[2] > -0.01 for n in hm.MOUNTS) and d.body("torso").xpos[2] > 0
+        return bool(all(d.geom(f"{n}_foot").xpos[2] > -0.01 for n in hm.MOUNTS) and d.body("torso").xpos[2] > 0)
 
     def lift(self, sec):
         """Поднять рукой: сила вверх за корпус 1,5 веса робота."""

@@ -18,15 +18,20 @@ def is_edge(dist_mm, status, base_mm, margin_mm):
     return status == VALID and dist_mm > base_mm + margin_mm
 
 
-def baseline(samples):
-    """Опорное расстояние до стола: медиана верных замеров (или None, если верных нет)."""
-    good = sorted(d for d, st in samples if st == VALID)
-    return good[len(good) // 2] if good else None
+def baseline(samples, nominal=None, tol=15):
+    """Опорное расстояние до стола: медиана верных замеров (или None, если верных нет). С расчётным nominal берутся
+    только замеры в ±tol мм от него, а если таких нет — сам nominal: робот, включённый носом к предмету, не примет
+    предмет за стол (иначе потом обычный стол покажется ему краем)."""
+    good = sorted(d for d, st in samples if st == VALID and (nominal is None or abs(d - nominal) <= tol))
+    if not good:
+        return nominal
+    return good[len(good) // 2]
 
 
 class EdgeArray:
-    def __init__(self, i2c, xshut_pins, names, addr0=0x30, budget_ms=20, margin_mm=25, make=VL53L4CD):
+    def __init__(self, i2c, xshut_pins, names, addr0=0x30, budget_ms=20, margin_mm=25, make=VL53L4CD, nominal=None):
         self.names, self.margin = names, margin_mm
+        self.nominal = nominal or [None] * len(names)
         self.sensors, self.missing = [], []
         for pin in xshut_pins:
             pin.value(0)
@@ -61,7 +66,7 @@ class EdgeArray:
             sleep_ms(wait_ms)
             for i, m in enumerate(self.read()):
                 samples[i].append(m)
-        self.base = [baseline(s) for s in samples]
+        self.base = [baseline(s, n) for s, n in zip(samples, self.nominal)]
         return self.base
 
     def flags(self):

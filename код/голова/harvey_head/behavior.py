@@ -226,7 +226,16 @@ class Behavior:
 
     def _home_approach(self, tel, events, vision, now):
         """Вперёд, пока передние датчики края не покажут: площадка (ближе), снова стол, башенка (ближе)."""
-        edge = tel.get("edge") or [0] * 6
+        if self._passed_pad_reached_tower(tel.get("edge") or [0] * 6):
+            self._go("home_back", now)
+            return STILL, "stand"
+        dock = vision.get("dock")
+        if dock is not None and (abs(dock["y_mm"]) > REALIGN_MM or abs(dock["yaw_deg"]) > REALIGN_DEG):
+            self._go("home_align", now, seen=now)
+            return STILL, "stand"
+        return self._steer(dock), "stand"
+
+    def _passed_pad_reached_tower(self, edge) -> bool:
         d = (edge[FRONT[0]] + edge[FRONT[1]]) / 2
         ref = self.data["ref"] = self.data["ref"] or d
         step = self.data["step"]
@@ -234,22 +243,23 @@ class Behavior:
             self.data["step"] = "table"
         elif step == "table" and d >= ref - BACK_MM:
             self.data["step"] = "tower"
-        elif step == "tower" and d <= ref - DROP_MM:
-            self._go("home_back", now)
-            return STILL, "stand"
-        dock = vision.get("dock")
-        if dock is not None and (abs(dock["y_mm"]) > REALIGN_MM or abs(dock["yaw_deg"]) > REALIGN_DEG):
-            self._go("home_align", now, seen=now)
-            return STILL, "stand"
+        return step == "tower" and d <= ref - DROP_MM
+
+    def _steer(self, dock) -> tuple:
+        """Прямо к станции: по метке — поправка вбок и по курсу, без неё — держать курс гироскопом."""
         if dock is not None:
-            return (APPROACH_SPEED, clip(-SIDE_GAIN * dock["y_mm"], SIDE_MAX), clip(-HOLD_GAIN * dock["yaw_deg"], HOLD_MAX)), "stand"
-        return (APPROACH_SPEED, 0, clip(HOLD_GAIN * (self.data["h0"] - self.heading), HOLD_MAX)), "stand"
+            return (APPROACH_SPEED, clip(-SIDE_GAIN * dock["y_mm"], SIDE_MAX), clip(-HOLD_GAIN * dock["yaw_deg"], HOLD_MAX))
+        return (APPROACH_SPEED, 0, clip(HOLD_GAIN * (self.data["h0"] - self.heading), HOLD_MAX))
+
+    def _back_for(self, sec, then, pose, now):
+        """Пятиться sec секунд, потом — состояние then."""
+        if now - self.t0 >= sec:
+            self._go(then, now)
+            return STILL, pose
+        return (-APPROACH_SPEED, 0, 0), "stand"
 
     def _home_back(self, tel, events, vision, now):
-        if now - self.t0 >= OVERSHOOT_S:
-            self._go("home_lie", now)
-            return STILL, "lie"
-        return (-APPROACH_SPEED, 0, 0), "stand"
+        return self._back_for(OVERSHOOT_S, "home_lie", "lie", now)
 
     def _home_lie(self, tel, events, vision, now):
         bat = tel.get("bat") or [0, 0]
@@ -266,10 +276,7 @@ class Behavior:
         return STILL, "lie"
 
     def _home_retry(self, tel, events, vision, now):
-        if now - self.t0 >= RETRY_BACK_S:
-            self._go("home_search", now)
-            return STILL, "stand"
-        return (-APPROACH_SPEED, 0, 0), "stand"
+        return self._back_for(RETRY_BACK_S, "home_search", "stand", now)
 
     def _docked(self, tel, events, vision, now):
         return STILL, "lie"

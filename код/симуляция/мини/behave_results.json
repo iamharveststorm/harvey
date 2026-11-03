@@ -1,0 +1,618 @@
+{
+ "домой_по_метке": [
+  {
+   "states": [
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 1.0,
+   "yaw": 0,
+   "t": 7.9,
+   "state": "docked",
+   "start": [
+    -0.1,
+    0.0,
+    0
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    13,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 1.0,
+   "yaw": -40,
+   "t": 12.0,
+   "state": "docked",
+   "start": [
+    -0.1397777478867205,
+    0.07764571353075622,
+    40
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    12,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.8,
+   "yaw": 30,
+   "t": 10.4,
+   "state": "docked",
+   "start": [
+    -0.03793852415718171,
+    -0.06840402866513375,
+    -30
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    7,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "home_retry",
+    "home_search",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.7,
+   "yaw": 270,
+   "t": 30.9,
+   "state": "docked",
+   "start": [
+    -0.15310889132455355,
+    0.17499999999999996,
+    90
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    -5,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.4,
+   "yaw": 210,
+   "t": 20.5,
+   "state": "docked",
+   "start": [
+    -0.04151111077974451,
+    -0.1606969024216348,
+    150
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    -7,
+    1
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 1.0,
+   "yaw": 120,
+   "t": 16.3,
+   "state": "docked",
+   "start": [
+    -0.06213203435596426,
+    0.21213203435596426,
+    -120
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    5,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.7,
+   "yaw": 180,
+   "t": 15.5,
+   "state": "docked",
+   "start": [
+    -0.02726539554219745,
+    0.03125667198004746,
+    180
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    10,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 1.0,
+   "yaw": -60,
+   "t": 12.1,
+   "state": "docked",
+   "start": [
+    -0.1490815697220945,
+    -0.1394640263744308,
+    60
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    4,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "home_retry",
+    "home_search",
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 1.0,
+   "yaw": 61,
+   "t": 23.5,
+   "state": "docked",
+   "start": [
+    -0.030213449743578202,
+    0.12618681599723014,
+    -60
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    12,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_align",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.5,
+   "yaw": 0,
+   "t": 15.1,
+   "state": "docked",
+   "start": [
+    -0.029980530712231057,
+    -0.21449244407331386,
+    0
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    4,
+    0
+   ]
+  }
+ ],
+ "домой_по_маяку_с_оси": [
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.8,
+   "yaw": 0,
+   "t": 23.9,
+   "state": "docked",
+   "start": [
+    -0.1,
+    0.0,
+    0
+   ],
+   "camera": false,
+   "charging": true,
+   "miss_mm": [
+    -11,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.8,
+   "yaw": -31,
+   "t": 26.9,
+   "state": "docked",
+   "start": [
+    -0.15,
+    0.0,
+    30
+   ],
+   "camera": false,
+   "charging": true,
+   "miss_mm": [
+    -13,
+    -2
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.8,
+   "yaw": 45,
+   "t": 19.4,
+   "state": "docked",
+   "start": [
+    -0.05000000000000002,
+    0.0,
+    -45
+   ],
+   "camera": false,
+   "charging": true,
+   "miss_mm": [
+    -9,
+    -1
+   ]
+  }
+ ],
+ "домой_по_маяку_вбок": [
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "home_retry",
+    "home_search",
+    "home_center",
+    "home_approach"
+   ],
+   "fell": false,
+   "max_tilt": 1.7,
+   "yaw": -49,
+   "t": 45.0,
+   "state": "home_approach",
+   "start": [
+    -0.1397777478867205,
+    0.07764571353075622,
+    40
+   ],
+   "camera": false,
+   "charging": false,
+   "miss_mm": [
+    47,
+    10
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "home_retry",
+    "home_search",
+    "home_center",
+    "edge",
+    "home_search",
+    "edge",
+    "home_search",
+    "home_center"
+   ],
+   "fell": false,
+   "max_tilt": 4.0,
+   "yaw": 401,
+   "t": 45.0,
+   "state": "home_center",
+   "start": [
+    -0.03793852415718171,
+    -0.06840402866513375,
+    -30
+   ],
+   "camera": false,
+   "charging": false,
+   "miss_mm": [
+    -120,
+    -72
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "edge",
+    "home_search"
+   ],
+   "fell": false,
+   "max_tilt": 3.0,
+   "yaw": 521,
+   "t": 45.0,
+   "state": "home_search",
+   "start": [
+    -0.15310889132455355,
+    0.17499999999999996,
+    90
+   ],
+   "camera": false,
+   "charging": false,
+   "miss_mm": [
+    24,
+    -38
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "home_retry",
+    "home_search",
+    "home_center"
+   ],
+   "fell": false,
+   "max_tilt": 1.7,
+   "yaw": 207,
+   "t": 45.0,
+   "state": "home_center",
+   "start": [
+    -0.04151111077974451,
+    -0.1606969024216348,
+    150
+   ],
+   "camera": false,
+   "charging": false,
+   "miss_mm": [
+    -58,
+    -53
+   ]
+  }
+ ],
+ "станция_сзади": {
+  "states": [
+   "home_search",
+   "edge",
+   "home_search",
+   "home_lost"
+  ],
+  "fell": false,
+  "max_tilt": 3.5,
+  "yaw": 503,
+  "t": 17.6,
+  "state": "home_lost",
+  "on_table": true
+ },
+ "осмотреться": {
+  "states": [
+   "look",
+   "idle"
+  ],
+  "fell": false,
+  "max_tilt": 0.8,
+  "yaw": 365,
+  "t": 18.5,
+  "state": "idle",
+  "drift_mm": 2
+ },
+ "рука_впереди": {
+  "states": [
+   "hand",
+   "at_hand"
+  ],
+  "fell": false,
+  "max_tilt": 0.3,
+  "yaw": 24,
+  "t": 6.2,
+  "state": "at_hand",
+  "hand_mm": 89,
+  "on_table": true
+ },
+ "рука_сзади": {
+  "states": [
+   "look",
+   "hand",
+   "at_hand"
+  ],
+  "fell": false,
+  "max_tilt": 0.5,
+  "yaw": 168,
+  "t": 11.5,
+  "state": "at_hand",
+  "hand_mm": 89,
+  "on_table": true
+ },
+ "рука_за_краем": [
+  {
+   "states": [
+    "hand",
+    "edge",
+    "look",
+    "hand",
+    "edge",
+    "look"
+   ],
+   "fell": false,
+   "max_tilt": 0.6,
+   "yaw": 500,
+   "t": 25.0,
+   "state": "look",
+   "side": "front",
+   "on_table": true,
+   "edge_seen": true
+  },
+  {
+   "states": [
+    "hand",
+    "edge",
+    "look",
+    "hand",
+    "edge",
+    "look"
+   ],
+   "fell": false,
+   "max_tilt": 0.6,
+   "yaw": 500,
+   "t": 25.0,
+   "state": "look",
+   "side": "left",
+   "on_table": true,
+   "edge_seen": true
+  },
+  {
+   "states": [
+    "hand",
+    "edge",
+    "look",
+    "hand",
+    "edge",
+    "look"
+   ],
+   "fell": false,
+   "max_tilt": 0.6,
+   "yaw": 500,
+   "t": 25.0,
+   "state": "look",
+   "side": "back",
+   "on_table": true,
+   "edge_seen": true
+  },
+  {
+   "states": [
+    "hand",
+    "edge",
+    "look",
+    "hand",
+    "edge",
+    "look"
+   ],
+   "fell": false,
+   "max_tilt": 0.6,
+   "yaw": 500,
+   "t": 25.0,
+   "state": "look",
+   "side": "right",
+   "on_table": true,
+   "edge_seen": true
+  }
+ ],
+ "подняли": {
+  "states": [
+   "look",
+   "lifted",
+   "look"
+  ],
+  "fell": false,
+  "max_tilt": 2.7,
+  "yaw": 157,
+  "t": 12.0,
+  "state": "look",
+  "relaxed_after_s": 0.25,
+  "on_table": true
+ }
+}
