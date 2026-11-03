@@ -4,10 +4,12 @@
 в шаги модуль походки. Рефлексы края и «подняли» остаются в RP2350: поведение лишь решает, что делать дальше.
 
 Цели (request): «look» — осмотреться, «hand» — подойти к руке, «home» — на станцию.
-«Зрение» (камера, разбор — на ПК или голове) — словарь находок: "hand" — {"bearing_deg", "dist_mm"} руки в кадре,
-"dock" — {"x_mm", "y_mm", "yaw_deg"}: где корпус в системе станции по метке AprilTag на башенке (x — к башенке, 0 — над
-контактами). Домой: по метке выйти на ось станции, потом прямо, поправляясь по метке; без метки — по ИК-маяку
-(только направление: попадает на контакты, лишь если Харви уже стоит почти на оси).
+«Зрение» (камера, разбор — на голове, harvey_head/dock_tag.py, или на ПК) — словарь находок: "hand" и "dock" —
+{"bearing_deg", "dist_mm"} руки или метки AprilTag станции в кадре.
+Домой — без ПК и в темноте: найти станцию (метка или ИК-маяк), повернуться к ней (по метке — сразу, по маяку — проход
+сектора туда и обратно), выйти на ось станции по центральному ИК-приёмнику (tel["axis"]: станция шлёт пачки левого и
+правого светодиода, за перегородкой оба видны только в клине вдоль оси) шагом вбок, держа станцию перед собой, и идти
+прямо, поправляясь вбок и по курсу по тому же клину. Метка лишь точнее держит направление; ось даёт только маяк.
 Курс — интеграл вращения гироскопа (tel["gyr"][2], °/с): повороты — на угол, а не по времени (корпус разгоняется
 и тормозит с запаздыванием), при ходьбе курс держится сам.
 Числа — оценки по симуляции (код/симуляция/мини/mini_behave.py), ПРЕДВАРИТЕЛЬНО: уточнить на роботе.
@@ -28,12 +30,13 @@ SEARCH_RATE, SEARCH_TURN = 30.0, 370.0                    # полный обо�
 CENTER_RATE = 20.0
 APPROACH_SPEED, DROP_MM, BACK_MM = 40.0, 8, 4             # площадка и башенка ближе стола на ≥ 8 мм; «снова стол» — в 4 мм
 HOLD_GAIN, HOLD_MAX = 2.0, 15.0                           # держать курс при ходьбе
-ALIGN_X, ALIGN_TOL = -250.0, (8.0, 2.0, 1.5)              # точка на оси станции перед заходом; допуск x, y мм и курс °
-ALIGN_GAIN, ALIGN_V, ALIGN_TURN, TAG_LOST_S = 1.5, (40.0, 30.0), 20.0, 1.0
-SIDE_GAIN, SIDE_MAX = 3.0, 15.0                           # на заходе — поправка вбок по метке
-REALIGN_MM, REALIGN_DEG = 10.0, 5.0                       # на заходе ушёл с оси дальше — снова выйти на ось
+FACE_DONE = 1.0                                           # повернулся к метке — в 1°
+AXIS_V, AXIS_D, AXIS_TIMEOUT_S, AXIS_CREEP = 25.0, 400.0, 25.0, 20.0   # шаг вбок к оси; до станции, если метки нет
+FINE_V, LOST_S, AXIS_DONE_MM = 5.0, 1.0, 1.0              # на заходе: ушёл из клина — шаг вбок 5 мм/с (резкая смена шага вбок дёргает корпус); середина клина — в 1 мм
 OVERSHOOT_S = 0.45                                        # башенку видно, когда корпус на ~17 мм дальше контактов
-LIE_WAIT_S, RETRY_BACK_S = 3.0, 2.0
+TABLE_HOLD_S = 0.6                                        # «снова стол» — не меньше 0,6 с: у края площадки луч дрожит от шага
+RX_MM = 71.0                                              # центральный ИК-приёмник впереди центра корпуса
+LIE_WAIT_S, RETRY_BACK_S = 3.0, 5.0                       # повтор: отойти на 20 см — чтобы снова увидеть площадку
 CHARGE_A = -0.05                                          # ток заряда (как spine.CHARGE_A)
 
 
@@ -43,12 +46,14 @@ class Behavior:
         self.t0 = now
         self.data: dict = {}
         self.retries = 0
-        self.heading, self.t_last = 0.0, now
+        self.heading, self.t_last, self.dt = 0.0, now, 0.0
+        self.on_axis = False                                # на оси станции — осталось повернуться к ней и идти
 
     # ---------- управление ----------
     def request(self, goal: str, now: float) -> None:
         self.goal = goal
         self.retries = 0
+        self.on_axis = False
         self._begin(goal, now)
 
     def _begin(self, goal: str, now: float) -> None:
@@ -66,7 +71,8 @@ class Behavior:
         return (0, 0, max(-rate, min(rate, TURN_GAIN * err)))
 
     def update(self, tel: dict, events: list[str], vision: dict | None, now: float) -> dict:
-        self.heading += (tel.get("gyr") or [0, 0, 0])[2] * (now - self.t_last)
+        self.dt = now - self.t_last
+        self.heading += (tel.get("gyr") or [0, 0, 0])[2] * self.dt
         self.t_last = now
         self._interrupts(tel, events, now)
         v, pose = STATES[self.state](self, tel, events, vision or {}, now)
@@ -156,9 +162,17 @@ class Behavior:
         return STILL, "stand"
 
     # ---------- домой ----------
+    def _faced(self, now):
+        """Повернулся к станции: если уже на оси — заход, иначе — выйти на ось."""
+        if self.on_axis:
+            self._go("home_approach", now, ref=None, step="pad", lost=None)
+        else:
+            self._go("home_axis", now, lat=0.0, vy=0.0, edges=[], inside=None)
+
     def _home_search(self, tel, events, vision, now):
+        self.on_axis = False
         if vision.get("dock"):
-            self._go("home_align", now, seen=now)
+            self._go("home_face", now)
             return STILL, "stand"
         if tel.get("beacon", "none") != "none":
             self._go("home_center", now, phase="edge")
@@ -168,22 +182,67 @@ class Behavior:
             return STILL, "stand"
         return (0, 0, SEARCH_RATE), "stand"
 
-    def _home_align(self, tel, events, vision, now):
-        """По метке — в точку на оси станции лицом к башенке: шагом вперёд-назад, вбок и поворотом сразу."""
+    def _home_face(self, tel, events, vision, now):
+        """Метка в кадре — повернуться прямо к ней."""
         dock = vision.get("dock")
         if dock is None:
-            if now - self.data["seen"] > TAG_LOST_S:
-                self._go("home_search", now)
+            self._go("home_search", now)
             return STILL, "stand"
-        self.data["seen"] = now
-        ex, ey, eyaw = ALIGN_X - dock["x_mm"], -dock["y_mm"], -dock["yaw_deg"]
-        if abs(ex) < ALIGN_TOL[0] and abs(ey) < ALIGN_TOL[1] and abs(eyaw) < ALIGN_TOL[2]:
-            self._go("home_approach", now, ref=None, step="pad")
+        if abs(dock["bearing_deg"]) < FACE_DONE:
+            self._faced(now)
             return STILL, "stand"
-        c, s = math.cos(math.radians(dock["yaw_deg"])), math.sin(math.radians(dock["yaw_deg"]))
-        rx, ry = c * ex + s * ey, -s * ex + c * ey                  # ошибка в системе корпуса
-        return (clip(ALIGN_GAIN * rx, ALIGN_V[0]), clip(ALIGN_GAIN * ry, ALIGN_V[1]),
-                clip(TURN_GAIN * eyaw, ALIGN_TURN)), "stand"
+        return (0, 0, clip(TURN_GAIN * dock["bearing_deg"], CENTER_RATE)), "stand"
+
+    def _home_axis(self, tel, events, vision, now):
+        """Выйти на ось станции: шагом вбок пройти клин, где центральный приёмник видит оба светодиода, туда и обратно
+        (как сектор маяка) и встать на его середину. Станцию держать перед собой: по метке — доворот на неё, без метки —
+        доворот на шаг вбок с расстояния AXIS_D. Потом снова повернуться к станции — с оси это и есть курс по оси."""
+        side, dock, d = tel.get("axis", "none"), vision.get("dock"), self.data
+        if now - self.t0 > AXIS_TIMEOUT_S:
+            self._go("home_search", now)
+            return STILL, "stand"
+        d["lat"] += d["vy"] * self.dt
+        d.setdefault("h_ref", self.heading)
+        if side == "none":
+            d.update(edges=[], inside=None, vy=0.0)
+            return (AXIS_CREEP, 0, self._facing(dock, 0.0)), "stand"
+        if d["edges"] == [] and d["inside"] is None:
+            d["inside"] = side == "on"
+        vy = self._cross_wedge(side, d)
+        if vy is None:
+            self.on_axis = True
+            self._go("home_center" if dock is None else "home_face", now, phase="edge")
+            return STILL, "stand"
+        d["vy"] = vy
+        return (0, vy, self._facing(dock, vy)), "stand"
+
+    def _cross_wedge(self, side, d) -> float | None:
+        """Скорость вбок, чтобы пройти клин туда и обратно и встать на середину; None — уже на середине.
+        Корпус догоняет команду шага с запаздыванием ~0,3 с, и край, замеченный на ходу, сдвинут по ходу. Четыре края —
+        два прохода в разные стороны — это сдвиг гасят; на месте счёт шагов по командам точен."""
+        inside = side == "on"
+        if inside != d["inside"]:
+            d["inside"] = inside
+            if d["edges"] or inside:
+                d["edges"].append(self._receiver_lat())
+                if len(d["edges"]) == 2:
+                    d["dir"] = -d["dir"]
+        if len(d["edges"]) >= 4:
+            err = sum(d["edges"][:4]) / 4 - self._receiver_lat()
+            return None if abs(err) < AXIS_DONE_MM else clip(2.0 * err, AXIS_V)
+        if not d["edges"]:                                  # ещё не входили в клин: к оси (изнутри — сначала вправо)
+            d["dir"] = AXIS_V if side == "right" else -AXIS_V
+        return d["dir"]
+
+    def _receiver_lat(self) -> float:
+        """Где центральный приёмник вбок (мм) от места, где начали искать ось: шаги вбок плюс доворот корпуса."""
+        return self.data["lat"] + RX_MM * math.sin(math.radians(self.heading - self.data["h_ref"]))
+
+    def _facing(self, dock, vy) -> float:
+        """Доворот, чтобы станция оставалась впереди при шаге вбок."""
+        if dock:
+            return clip(TURN_GAIN * dock["bearing_deg"] + math.degrees(-vy / dock["dist_mm"]), CENTER_RATE)
+        return math.degrees(-vy / AXIS_D)
 
     def _home_center(self, tel, events, vision, now):
         """Пройти сектор, где маяк видят оба приёмника, туда и обратно и встать на его середину. Направление на маяк
@@ -191,7 +250,7 @@ class Behavior:
         в обе стороны опоздания гасятся."""
         seen = tel.get("beacon", "none")
         if vision.get("dock"):
-            self._go("home_align", now, seen=now)
+            self._go("home_face", now)
             return STILL, "stand"
         if seen == "none":
             self._go("home_search", now)
@@ -220,36 +279,54 @@ class Behavior:
     def _center_back(self, seen, now):
         turn = self.turn_to(self.data["target"], CENTER_RATE)
         if turn is None:
-            self._go("home_approach", now, ref=None, step="pad")
+            self._faced(now)
             return STILL
         return turn
 
     def _home_approach(self, tel, events, vision, now):
         """Вперёд, пока передние датчики края не покажут: площадка (ближе), снова стол, башенка (ближе)."""
-        if self._passed_pad_reached_tower(tel.get("edge") or [0] * 6):
+        if self._passed_pad_reached_tower(tel.get("edge") or [0] * 6, now):
             self._go("home_back", now)
             return STILL, "stand"
-        dock = vision.get("dock")
-        if dock is not None and (abs(dock["y_mm"]) > REALIGN_MM or abs(dock["yaw_deg"]) > REALIGN_DEG):
-            self._go("home_align", now, seen=now)
-            return STILL, "stand"
-        return self._steer(dock), "stand"
+        side = tel.get("axis", "none")
+        if side == "none":
+            lost = self.data["lost"] = self.data["lost"] or now
+            if now - lost > LOST_S:
+                self.on_axis = False
+                self._go("home_axis", now, lat=0.0, vy=0.0, edges=[], inside=None)
+                return STILL, "stand"
+        else:
+            self.data["lost"] = None
+        return self._steer(side), "stand"
 
-    def _passed_pad_reached_tower(self, edge) -> bool:
+    def _passed_pad_reached_tower(self, edge, now) -> bool:
         d = (edge[FRONT[0]] + edge[FRONT[1]]) / 2
         ref = self.data["ref"] = self.data["ref"] or d
+        near, table = d <= ref - DROP_MM, d >= ref - BACK_MM
         step = self.data["step"]
-        if step == "pad" and d <= ref - DROP_MM:
-            self.data["step"] = "table"
-        elif step == "table" and d >= ref - BACK_MM:
-            self.data["step"] = "tower"
-        return step == "tower" and d <= ref - DROP_MM
+        if step == "pad":
+            if near:
+                self.data["step"] = "table"
+            return False
+        if step == "table":
+            if table:
+                self.data.update(step="tower", t_table=now)
+            return False
+        return near and self._table_held(now)
 
-    def _steer(self, dock) -> tuple:
-        """Прямо к станции: по метке — поправка вбок и по курсу, без неё — держать курс гироскопом."""
-        if dock is not None:
-            return (APPROACH_SPEED, clip(-SIDE_GAIN * dock["y_mm"], SIDE_MAX), clip(-HOLD_GAIN * dock["yaw_deg"], HOLD_MAX))
-        return (APPROACH_SPEED, 0, clip(HOLD_GAIN * (self.data["h0"] - self.heading), HOLD_MAX))
+    def _table_held(self, now) -> bool:
+        """Стол под датчиками держался TABLE_HOLD_S — значит, это башенка; иначе луч дрогнул у края площадки."""
+        if now - self.data["t_table"] >= TABLE_HOLD_S:
+            return True
+        self.data["step"] = "table"
+        return False
+
+    def _steer(self, side) -> tuple:
+        """Прямо по оси, курс — гироскопом (его задал поворот к станции с оси). Вышел из клина — шаг вбок к оси.
+        Приёмник клина — в 71 мм перед центром корпуса, поэтому важен именно курс: 2,5° мимо оси — это 3 мм брюха мимо
+        контактов. На метку у самой станции не довернуть: с близкого расстояния это раскачивает."""
+        vy = -FINE_V if side == "left" else FINE_V if side == "right" else 0
+        return (APPROACH_SPEED, vy, clip(HOLD_GAIN * (self.data["h0"] - self.heading), HOLD_MAX))
 
     def _back_for(self, sec, then, pose, now):
         """Пятиться sec секунд, потом — состояние then."""
@@ -298,7 +375,7 @@ def away_from(far) -> tuple:
 
 STATES = {"idle": Behavior._idle, "look": Behavior._look, "hand": Behavior._hand, "at_hand": Behavior._at_hand,
           "edge": Behavior._edge, "lifted": Behavior._lifted, "home_search": Behavior._home_search,
-          "home_align": Behavior._home_align, "home_center": Behavior._home_center, "home_approach": Behavior._home_approach, "home_back": Behavior._home_back,
+          "home_face": Behavior._home_face, "home_axis": Behavior._home_axis, "home_center": Behavior._home_center, "home_approach": Behavior._home_approach, "home_back": Behavior._home_back,
           "home_lie": Behavior._home_lie, "home_retry": Behavior._home_retry, "docked": Behavior._docked,
           "home_lost": Behavior._stopped, "home_failed": Behavior._stopped}
 CENTER_STEPS = {"edge": Behavior._center_edge, "sweep": Behavior._center_sweep, "back": Behavior._center_back}

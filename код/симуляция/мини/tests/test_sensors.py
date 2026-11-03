@@ -80,27 +80,47 @@ def test_imu_at_rest_reads_one_g_up_and_no_rotation():
 
 # ---------- ИК-маяк ----------
 def counts(yaw, x=DOCK[0] - 0.30, y=0.0):
+    """((слева L, R), (по центру L, R), (справа L, R)) за окно 100 мс."""
     s = sim_at(x, y, yaw, dock=DOCK, settle=0.2)
-    b = ms.SimBeacon(s, ms.led_world(DOCK))
-    return b.take()
+    return ms.SimBeacon(s, DOCK).take()
 
 
-def test_beacon_straight_ahead_is_seen_by_both():
-    left, right = counts(0.0)
-    assert min(left, right) >= beacon.SEEN_MIN and beacon.bearing(left, right) == "ahead"
+def sides(c):
+    return beacon.bearing(sum(c[0]), sum(c[2]))
+
+
+def test_beacon_straight_ahead_on_the_axis():
+    c = counts(0.0)
+    assert sides(c) == "ahead" and beacon.axis_side(*c[1]) == "on"
+
+
+@pytest.mark.parametrize("y, side", [(0.04, "left"), (-0.04, "right")])
+def test_center_receiver_tells_the_side_of_the_station_axis(y, side):
+    yaw = math.degrees(math.atan2(-y, 0.30 + 0.144))               # лицом к светодиодам
+    assert beacon.axis_side(*counts(yaw, y=y)[1]) == side
+
+
+@pytest.mark.parametrize("y, side", [(0.0, "on"), (0.006, "left"), (-0.006, "right")])
+def test_the_on_axis_wedge_is_narrow_over_the_contacts(y, side):
+    assert beacon.axis_side(*counts(0.0, x=DOCK[0], y=y)[1]) == side
 
 
 def test_beacon_70_degrees_left_is_seen_by_the_left_receiver_only():
-    left, right = counts(-70.0)
-    assert left >= beacon.SEEN_MIN and right == 0 and beacon.bearing(left, right) == "left"
+    c = counts(-70.0)
+    assert sum(c[0]) >= beacon.SEEN_MIN and sum(c[2]) == 0 and sides(c) == "left"
 
 
 def test_beacon_behind_the_receivers_is_not_seen():
-    assert beacon.bearing(*counts(-125.0)) == "none"
+    assert sides(counts(-125.0)) == "none"
 
 
 def test_beacon_is_not_seen_from_behind_the_station():
-    assert beacon.bearing(*counts(180.0, x=DOCK[0] + 0.30)) == "none"
+    assert sides(counts(180.0, x=DOCK[0] + 0.30)) == "none"
+
+
+def test_fin_does_not_hide_the_tag_from_the_camera():
+    s = sim_at(DOCK[0] - 0.30, 0.0, 0.0, dock=DOCK)
+    assert ms.see_tag(s, DOCK) is not None
 
 
 @pytest.mark.parametrize("ee, angle, seen", [(0.30, 0, True), (0.20, 0, False), (31000.0, 0, False), (1.0, 95, False)])
@@ -144,12 +164,13 @@ def test_hand_outside_the_frame_is_not_seen():
 
 
 # ---------- «зрение»: метка AprilTag на башенке ----------
-def test_tag_gives_the_body_pose_in_the_station_frame():
+def test_tag_gives_direction_and_distance_from_the_body_centre():
     s = sim_at(DOCK[0] - 0.30, 0.04, 10.0, dock=DOCK)
     v = ms.see_tag(s, DOCK)
     x, y, _ = s.d.body("torso").xpos
-    assert v["x_mm"] == pytest.approx((x - DOCK[0]) * 1000, abs=0.5)
-    assert v["y_mm"] == pytest.approx(y * 1000, abs=0.5) and v["yaw_deg"] == pytest.approx(10.0, abs=0.5)
+    dx, dy = DOCK[0] + 0.140 - x, -y
+    assert v["dist_mm"] == pytest.approx(math.hypot(dx, dy) * 1000, abs=1.0)
+    assert v["bearing_deg"] == pytest.approx(math.degrees(math.atan2(dy, dx)) - 10.0, abs=0.5)
 
 
 def test_tag_is_not_seen_facing_away_or_from_behind_the_station():

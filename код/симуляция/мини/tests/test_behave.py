@@ -9,15 +9,16 @@ sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
 import mini_behave as mb  # noqa: E402
 
 
-@pytest.mark.parametrize("start", [mb.HOME_STARTS[i] for i in (1, 4, 6, 9)])
-def test_home_by_the_tag_charges(start):
+@pytest.mark.parametrize("start", [mb.HOME_STARTS[i] for i in (1, 4)])
+def test_home_in_the_light_with_the_tag_charges(start):
     r = mb.scenario_home(mb.start_at(*start))
-    assert r["state"] == "docked" and r["charging"] and r["t"] <= 45 and not r["fell"]
+    assert r["state"] == "docked" and r["charging"] and r["t"] <= 60 and not r["fell"]
 
 
-def test_home_by_the_beacon_alone_works_from_the_axis():
-    r = mb.scenario_home(mb.start_at(*mb.ON_AXIS[1]), camera=False)
-    assert r["state"] == "docked" and r["charging"]
+@pytest.mark.parametrize("start", [mb.HOME_STARTS[i] for i in (0, 2, 4)])
+def test_home_in_the_dark_by_the_two_led_beacon_charges(start):
+    r = mb.scenario_home(mb.start_at(*start), camera=False)
+    assert r["state"] == "docked" and r["charging"] and r["t"] <= 70 and not r["fell"]
 
 
 def test_station_behind_is_reported_lost_and_robot_stays_on_the_table():

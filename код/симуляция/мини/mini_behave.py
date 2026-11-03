@@ -72,7 +72,7 @@ def miss_mm(robot):
 
 
 class NoCamera:
-    """Робот без камеры (ПК не на связи): только датчики RP2350."""
+    """Темно: камера не видит метку — только датчики RP2350 (ИК-маяк с двумя светодиодами)."""
 
     def __init__(self, robot):
         self.robot = robot
@@ -84,7 +84,7 @@ class NoCamera:
         return {}
 
 
-def scenario_home(start, camera=True, limit_s=45.0):
+def scenario_home(start, camera=True, limit_s=90.0):
     r = mr.SimRobot(table=HOME_TABLE, dock_pos=DOCK, start=start)
     log = run(r if camera else NoCamera(r), "home", limit_s)
     log.update(start=list(start), camera=camera, charging=r.charging(), miss_mm=miss_mm(r))
@@ -94,7 +94,6 @@ def scenario_home(start, camera=True, limit_s=45.0):
 # старты перед станцией: расстояние до контактов, направление от оси станции, курс Харви (°)
 HOME_STARTS = [(0.25, 0, 0), (0.30, 15, 40), (0.20, -20, -30), (0.35, 30, 90), (0.25, -40, 150), (0.30, 45, -120),
                (0.18, 10, 180), (0.33, -25, 60), (0.22, 35, -60), (0.28, -50, 0)]
-ON_AXIS = [(0.25, 0, 0), (0.30, 0, 30), (0.20, 0, -45)]
 
 
 def start_at(dist, deg, yaw):
@@ -177,9 +176,8 @@ def scenario_lift():
 
 
 def all_scenarios():
-    res = {"домой_по_метке": [scenario_home(start_at(*s)) for s in HOME_STARTS],
-           "домой_по_маяку_с_оси": [scenario_home(start_at(*s), camera=False) for s in ON_AXIS],
-           "домой_по_маяку_вбок": [scenario_home(start_at(*s), camera=False) for s in HOME_STARTS[1:5]],
+    res = {"домой_при_свете": [scenario_home(start_at(*s)) for s in HOME_STARTS],
+           "домой_в_темноте": [scenario_home(start_at(*s), camera=False) for s in HOME_STARTS],
            "станция_сзади": scenario_behind_station(),
            "осмотреться": scenario_look(),
            "рука_впереди": scenario_hand((0.0662 + 0.30 * math.cos(math.radians(30)), 0.30 * math.sin(math.radians(30)))),

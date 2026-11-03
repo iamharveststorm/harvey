@@ -246,3 +246,10 @@ def test_rotation_rate_in_telemetry_for_turning_by_angle():
     p["imu"].gyr = (1.04, -2.0, 45.26)
     step(sp, clock, ms=60)
     assert p["port"].of("tel")[-1]["gyr"] == [1.0, -2.0, 45.3]
+
+
+def test_beacon_ahead_when_each_side_sees_a_led_even_if_one_sees_both():
+    sp, p, _, clock = make()
+    p["beacon"].next = ((33, 33), (33, 33), (0, 33))                # левый видит оба светодиода, правый — один
+    step(sp, clock, ms=10, n=12)
+    assert p["port"].of("tel")[-1]["beacon"] == "ahead"

@@ -278,7 +278,7 @@ RP_MAP = [
     ("GP8", "шина C · PIO UART TX"), ("GP9", "шина C · PIO UART RX"), ("GP10", "XSHUT датчика края 5 (бок, слева)"),
     ("GP11", "XSHUT датчика края 6 (бок, справа)"), ("GP12", "I2C0 SDA"), ("GP13", "I2C0 SCL"),
     ("GP14", "ИК-приёмник маяка, слева"), ("GP15", "ИК-приёмник маяка, справа"), ("GP26", "INT1 BMI270 (рывок, падение, «подняли»)"),
-    ("GP27", "ALERT INA226 (батарея, перегрузка)"), ("GP28", "резерв · АЦП"), ("GP29", "резерв · АЦП"),
+    ("GP27", "ALERT INA226 (батарея, перегрузка)"), ("GP28", "ИК-приёмник маяка, по центру"), ("GP29", "резерв · АЦП"),
 ]
 EDGE = [("вперёд, слева", "GP2"), ("вперёд, справа", "GP3"), ("назад, слева", "GP6"), ("назад, справа", "GP7"),
         ("бок, слева", "GP10"), ("бок, справа", "GP11")]
@@ -289,7 +289,7 @@ def rp_sheet():
     lab = ["3V3 (выход)", "GND"] + [f"{g} · {f}" for g, f in RP_MAP if not f.startswith("шина")]
     idx = {l.split(" · ")[0]: i + 1 for i, l in enumerate(lab)}
     c["RP"] = {"type": "RP2350-Zero", "subtype": "датчики (шины приводов — лист «Шины приводов»)", "pinlabels": lab, "show_pincount": False,
-               "notes": "Заняты все 20 выводов: касание перенесено на Pi Zero, резерв — GP28, GP29 (АЦП)"}
+               "notes": "Заняты 19 из 20 выводов: касание перенесено на Pi Zero, резерв — GP29 (АЦП)"}
     c["SH"] = {"type": "Плата шин — разъёмы датчиков", "subtype": "I2C0 на 3,3 В, подтяжка 2,2 кОм (на модулях подтяжки снять)",
                "pinlabels": ["3,3 В", "GND", "SDA", "SCL"], "notes": "звезда от платы шин к каждому датчику"}
     for k, (where, g) in enumerate(EDGE, 1):
@@ -309,9 +309,12 @@ def rp_sheet():
     c["INA"] = {"type": "INA226 на плате питания", "subtype": "I2C — лист «Питание и логика»", "pinlabels": ["ALERT"]}
     w["W_ALERT"] = {"wirecount": 1, "gauge": "30 AWG", "length": 0.10, "colors": ["WH"], "notes": "низкий заряд / перегрузка → прерывание"}
     x.append([{"RP": [idx["GP27"]]}, {"W_ALERT": [1]}, {"INA": [1]}])
-    for k, (nm, g) in enumerate((("слева", "GP14"), ("справа", "GP15")), 1):
-        c[f"IR{k}"] = {"type": f"ИК-приёмник {nm}: TSOP38238", "subtype": "38 кГц · на передней стенке по бокам камеры, развёрнут наружу на 30°",
-                       "pinlabels": ["VS 3,3 В", "GND", "OUT"], "notes": "найти станцию без ПК: сравнить сигнал слева и справа"}
+    for k, (nm, g, where, note) in enumerate((
+            ("слева", "GP14", "на передней стенке слева от камеры, развёрнут наружу на 30°", "куда повернуть к станции"),
+            ("по центру", "GP28", "под объективом камеры, смотрит вперёд", "по какую сторону оси станции корпус"),
+            ("справа", "GP15", "на передней стенке справа от камеры, развёрнут наружу на 30°", "куда повернуть к станции")), 1):
+        c[f"IR{k}"] = {"type": f"ИК-приёмник {nm}: TSOP38238", "subtype": f"38 кГц · {where}",
+                       "pinlabels": ["VS 3,3 В", "GND", "OUT"], "notes": f"без ПК и в темноте: {note}"}
         w[f"W_IR{k}"] = {"wirecount": 3, "gauge": "30 AWG", "length": 0.08, "colors": ["OG", "BK", "GN"], "notes": "~0,4 мА"}
         x.append([{"RP": [idx["3V3 (выход)"], idx["GND"], idx[g]]}, {f"W_IR{k}": [1, 2, 3]}, {f"IR{k}": [1, 2, 3]}])
     return {"metadata": {"title": "Харви «Компакт мини» — RP2350: датчики"}, "options": OPT,
@@ -330,13 +333,13 @@ def station_sheet():
               "pinlabels": ["1", "2"]}
     c["POGO"] = {"type": "Pogo-контакты Ø5, ход 1,5 мм", "subtype": "3–5 А · в гнёздах площадки dock_pad", "pinlabels": ["+5 В (y = +16)", "GND (y = −16)"],
                  "notes": "Харви опускает корпус на 13 мм — пластины брюха ложатся на контакты"}
-    c["BCN"] = {"type": "Плата маяка NE556", "subtype": "лист beacon: пачки 38 кГц, ИК-светодиод TSAL6200", "pinlabels": ["+5 В", "GND"],
-                "notes": "~40 мА в среднем"}
+    c["BCN"] = {"type": "Маяк: RP2350-Zero + 2 × AO3400A + 2 × TSAL6200", "subtype": "лист beacon: пачки 38 кГц левого (0,6 мс) и правого (1,2 мс) светодиода по очереди",
+                "pinlabels": ["+5 В", "GND"], "notes": "~50 мА в среднем: плата ~20 мА, светодиоды ≤ 15 мА каждый"}
     for name, n, gauge, length, colors, note in (
             ("W_PSU", 2, None, 1.5, ["BK", "BK"], "кабель USB-C от блока питания"),
             ("W_F", 2, "20 AWG", 0.05, ["RD", "BK"], "до 3 А"),
             ("W_POGO", 2, "20 AWG", 0.15, ["RD", "BK"], "до 3 А · по каналам площадки и перемычке в отсек"),
-            ("W_BCN", 2, "26 AWG", 0.05, ["RD", "BK"], "≈ 40 мА")):
+            ("W_BCN", 2, "26 AWG", 0.05, ["RD", "BK"], "≈ 50 мА")):
         w[name] = {"wirecount": n, "length": length, "colors": colors, "notes": note}
         if gauge:
             w[name]["gauge"] = gauge
@@ -351,72 +354,47 @@ def station_sheet():
 
 
 def beacon():
-    """Маяк на NE556 (документы/NE556 — даташит TI.pdf): таймер 1 — пачки ~500 в секунду (вкл 1,40 мс, выкл 0,57 мс),
-    таймер 2 — несущая 38 кГц, работает, пока выход таймера 1 держит его RESET в 1. tH = 0,693 (RA + RB) C,
-    tL = 0,693 RB C, f = 1,44 / ((RA + 2 RB) C). TSOP382 (даташит Vishay) требует пачки ≥ 10 периодов и паузы ≥ 12:
-    здесь 53 и 22. Ток TSAL6200 — 105 мА в импульсе, 37 мА в среднем (предел 100 мА)."""
+    """Маяк станции на RP2350-Zero (код/прошивка/станция/beacon_station.py): ШИМ 38 кГц (1/3) по очереди на левый
+    (GP0, пачка 0,6 мс) и правый (GP1, 1,2 мс) светодиод, пауза 0,6 мс. TSOP382 (документы/TSOP382 — даташит Vishay.pdf):
+    пачка ≥ 10 периодов, пауза ≥ 12, ≤ 1700 пачек/с — здесь 23 и 46 периодов, пауза 23, 667 пачек/с.
+    Ключи AO3400A (документы/AO3400A — даташит AOS.pdf: Vgs(th) ≤ 1,45 В, Rds(on) < 48 мОм при 2,5 В) — открываются от
+    3,3 В вывода. Светодиод TSAL6200: (5 − 1,35) / 33 ≈ 110 мА в импульсе (IFM 200 мА), в среднем ≤ 15 мА."""
     import schemdraw
     import schemdraw.elements as elm
     schemdraw.use("matplotlib")
     schemdraw.config(font="Arial", fontsize=11)
     d = schemdraw.Drawing(show=False)
-    side = lambda s, names: [elm.IcPin(name=n, pin=p, side=s, slot=f"{k}/6") for k, (n, p) in enumerate(names, 1)]
-    pins = side("left", [("TRIG1", "6"), ("THRES1", "2"), ("DISCH1", "1"), ("CONT1", "3"), ("RESET1", "4"), ("OUT1", "5")]) + \
-        side("right", [("TRIG2", "8"), ("THRES2", "12"), ("DISCH2", "13"), ("CONT2", "11"), ("RESET2", "10"), ("OUT2", "9")]) + \
-        [elm.IcPin(name="VCC", pin="14", side="top"), elm.IcPin(name="GND", pin="7", side="bot")]
+    pins = [elm.IcPin(name="5V", side="top"), elm.IcPin(name="GND", side="bot"),
+            elm.IcPin(name="GP0", side="right", slot="1/2"), elm.IcPin(name="GP1", side="right", slot="2/2")]
     tag = lambda at, text, loc: elm.Dot(open=True).at(at).label(text, loc)
     with d:
-        u = elm.Ic(pins=pins, size=(4.0, 12.0), pinspacing=2.0, edgepadH=1.0).label("NE556", "center")
+        u = elm.Ic(pins=pins, size=(3.0, 5.0), edgepadH=1.0).label("RP2350-Zero\nмаяк", "center")
         d += u
-        d += elm.Line().up(0.6).at(u.VCC); d += elm.Vdd().label("+5 В")
+        d += elm.Line().up(0.6).at(u["5V"]); d += elm.Vdd().label("+5 В")
         d += elm.Line().down(0.6).at(u.GND); d += elm.Ground()
-        for n, (dx, loc) in (("1", (-1, "left")), ("2", (1, "right"))):
-            pin = lambda name: getattr(u, name + n)
-            x = pin("DISCH")[0] + dx * 1.0
-            d += elm.Line().at(pin("OUT")).to((pin("OUT")[0] + dx * 1.0, pin("OUT")[1]))
-            d += elm.Line().at(pin("RESET")).to((x, pin("RESET")[1]))
-            d += elm.Line().at(pin("CONT")).to((x, pin("CONT")[1]))
-            d += elm.Capacitor().at((x, pin("CONT")[1])).to((x + dx * 2.0, pin("CONT")[1])).label("C3 10 нФ" if n == "1" else "C4 10 нФ", "top")
-            d += elm.Ground()
-            d += elm.Line().at(pin("DISCH")).to((x, pin("DISCH")[1])); d += elm.Dot()
-            d += elm.Resistor().at((x, pin("DISCH")[1])).to((x + dx * 3.0, pin("DISCH")[1])).label(
-                "RA1 12 кОм" if n == "1" else "RA2 1 кОм", "top")
-            d += tag(d.here, "+5 В", loc)
-            if n == "1":
-                d += elm.Resistor().at((x, pin("DISCH")[1])).to((x, pin("THRES")[1])).label("RB1\n8,2 кОм", "top")
-            else:
-                mid = (x, (pin("DISCH")[1] + pin("THRES")[1]) / 2)
-                d += elm.Resistor().at((x, pin("DISCH")[1])).to(mid).label("RB2\n15 кОм", "bottom")
-                d += elm.Potentiometer().at(mid).to((x, pin("THRES")[1])).label("RV 5 кОм\n→ 38 кГц", "bottom")
-            d += elm.Dot().at((x, pin("THRES")[1])); d += elm.Line().at((x, pin("THRES")[1])).to(pin("THRES"))
-            d += elm.Line().at((x, pin("THRES")[1])).to((x, pin("TRIG")[1])); d += elm.Dot()
-            d += elm.Line().at((x, pin("TRIG")[1])).to(pin("TRIG"))
-            d += elm.Capacitor().at((x, pin("TRIG")[1])).down(2.0).label("C1\n100 нФ" if n == "1" else "C2\n1 нФ",
-                                                                         "top" if dx < 0 else "bottom")
-            d += elm.Ground()
-        d += tag((u.OUT1[0] - 1.0, u.OUT1[1]), "OUT1 → RESET2 (10)", "left")
-        d += tag((u.RESET1[0] - 1.0, u.RESET1[1]), "+5 В", "left")
-        d += tag((u.RESET2[0] + 1.0, u.RESET2[1]), "← OUT1 (5)", "right")
-        # ---- выход: транзистор и ИК-светодиод
-        d += elm.Line().at((u.OUT2[0] + 1.0, u.OUT2[1])).right(4.0)
-        d += elm.Resistor().right(2.5).label("R1 1 кОм", "top")
-        q = elm.BjtNpn(circle=True).right().anchor("base").label("Q1\nBC337", "right")
-        d += q
-        d += elm.Line().down(1.0).at(q.emitter); d += elm.Ground()
-        d += elm.Line().up(0.4).at(q.collector)
-        d += elm.LED().up(2.0).reverse().label("D1 TSAL6200\n940 нм, ±17°", "bottom")
-        d += elm.Resistor().up(2.0).label("R2 33 Ом\n0,5 Вт", "bottom")
-        d += elm.Vdd().label("+5 В")
-        # ---- развязка питания у выводов 14 и 7
-        bx, by = u.GND[0] + 9.0, u.GND[1] + 1.0
-        d += elm.Capacitor().at((bx, by)).down(1.6).label("C5\n100 нФ", "bottom"); d += elm.Ground()
-        d += elm.Capacitor(polar=True).at((bx + 3.0, by)).down(1.6).label("C6\n10 мкФ", "bottom"); d += elm.Ground()
-        d += elm.Line().at((bx, by)).to((bx + 3.0, by)); d += tag((bx, by), "+5 В у 14", "left")
-        d += elm.Label().at((u.GND[0] - 8.0, u.GND[1] - 4.5)).label(
-            "Пачки: вкл 0,693·(12 + 8,2) кОм·100 нФ = 1,40 мс · выкл 0,693·8,2 кОм·100 нФ = 0,57 мс → 508 в секунду\n"
-            "Несущая: 1,44 / ((1 + 2·RB) кОм · 1 нФ): RB = RB2 + RV = 15–20 кОм → 46–35 кГц; RV выставить на 38 кГц (≈ 18,5 кОм)\n"
-            "Пачка 53 периода, пауза 22 (TSOP382: ≥ 10 и ≥ 12) · светодиод 105 мА в импульсе, 37 мА в среднем (предел 100 мА)\n"
-            "ПРЕДВАРИТЕЛЬНО: Q1 — любой NPN ≥ 200 мА (BC337, 2N2222); частоту проверить на стенде по дальности приёма", "right")
+        # ближний к плате канал — от верхнего вывода (GP1), дальний — от нижнего (GP0): провода не пересекаются
+        for k, (pin, name, burst, nr) in enumerate(((u.GP1, "правый (−y)", "1,2 мс", 2), (u.GP0, "левый (+y)", "0,6 мс", 1))):
+            xg, y = pin[0] + 4.5 + k * 6.0, pin[1]
+            d += elm.Line().at(pin).to((xg - 3.1, y))
+            d += elm.Resistor().at((xg - 3.1, y)).to((xg - 0.6, y)).label(f"R{2 + nr} 100 Ом", "top")
+            d += elm.Dot().at((xg - 0.6, y))
+            d += elm.Line().at((xg - 0.6, y)).to((xg, y))
+            q = elm.NFet(bulk=False).reverse().anchor("gate").at((xg, y)).label(f"Q{nr}\nAO3400A", "right")
+            d += q
+            d += elm.Resistor().at((xg - 0.6, y)).down(2.0).label(f"R{4 + nr}\n100 кОм", "top"); d += elm.Ground()
+            d += elm.Line().down(0.5).at(q.source); d += elm.Ground()
+            d += elm.Line().up(0.3).at(q.drain)
+            d += elm.LED().up(2.0).reverse().label(f"D{nr} TSAL6200\n{name}\nпачка {burst}", "bottom")
+            d += elm.Resistor().up(2.0).label(f"R{nr} 33 Ом\n0,25 Вт", "bottom")
+            d += elm.Vdd().label("+5 В")
+        bx, by = u.GND[0] - 6.0, u.GND[1] + 1.0
+        d += elm.Capacitor(polar=True).at((bx, by)).down(1.6).label("C1\n10 мкФ", "bottom"); d += elm.Ground()
+        d += tag((bx, by), "+5 В у светодиодов", "left")
+        d += elm.Label().at((u.GND[0] - 7.0, u.GND[1] - 4.0)).label(
+            "Пачки по очереди: левый 0,6 мс (23 периода), пауза 0,6 мс, правый 1,2 мс (46), пауза 0,6 мс → 333 пачки/с каждого\n"
+            "Харви различает их по длине импульса TSOP (tpo = tpi ± 132 мкс): граница 0,9 мс\n"
+            "Светодиоды — в стенке башенки на высоте 12 мм, в 3,5 мм от оси, между ними перегородка 42,5 мм (модели/мини, dock_tower)\n"
+            "ПРЕДВАРИТЕЛЬНО: R 100 Ом гасит звон затвора, 100 кОм держит ключ закрытым при старте платы; проверить на стенде", "right")
     return d
 
 

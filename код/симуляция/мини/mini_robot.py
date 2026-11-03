@@ -66,7 +66,7 @@ class SimRobot:
         bus = ms.SimBus(self.sim)
         tof = edge.EdgeArray(None, [Pin() for _ in pins.EDGE_NAMES], pins.EDGE_NAMES, pins.EDGE_ADDR0,
                              make=ms.tof_factory(self.sim), nominal=pins.EDGE_NOMINAL_MM)
-        beacon = ms.SimBeacon(self.sim, ms.led_world(dock_pos)) if dock_pos is not None else None
+        beacon = ms.SimBeacon(self.sim, dock_pos) if dock_pos is not None else None
         self.spine = Spine(self.port, {"A": bus, "B": bus, "C": bus}, edge=tof, imu=ms.SimImu(self.sim),
                            ina=ms.SimIna(self.charging), beacon=beacon, cfg=CFG, clock=lambda: round(self.t * 1000))
         self._send({"t": "cal"})

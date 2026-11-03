@@ -36,12 +36,13 @@ connectors:
     - GND (y = −16)
     notes: Харви опускает корпус на 13 мм — пластины брюха ложатся на контакты
   BCN:
-    type: Плата маяка NE556
-    subtype: 'лист beacon: пачки 38 кГц, ИК-светодиод TSAL6200'
+    type: 'Маяк: RP2350-Zero + 2 × AO3400A + 2 × TSAL6200'
+    subtype: 'лист beacon: пачки 38 кГц левого (0,6 мс) и правого (1,2 мс) светодиода
+      по очереди'
     pinlabels:
     - +5 В
     - GND
-    notes: ~40 мА в среднем
+    notes: '~50 мА в среднем: плата ~20 мА, светодиоды ≤ 15 мА каждый'
 cables:
   W_PSU:
     wirecount: 2
@@ -72,7 +73,7 @@ cables:
     colors:
     - RD
     - BK
-    notes: ≈ 40 мА
+    notes: ≈ 50 мА
     gauge: 26 AWG
 connections:
 - - PSU:

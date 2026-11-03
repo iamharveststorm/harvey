@@ -8,8 +8,9 @@ from harvey_head.behavior import Behavior
 DT = 0.05                                    # телеметрия 20 раз в секунду
 
 
-def tel(far=(0,) * 6, beacon="none", edge=(70, 70, 72, 72, 104, 104), tilt=(0.0, 0.0)):
-    return {"t": "tel", "far": list(far), "beacon": beacon, "edge": list(edge), "tilt": list(tilt), "bat": [7.4, 1.0]}
+def tel(far=(0,) * 6, beacon="none", edge=(70, 70, 72, 72, 104, 104), tilt=(0.0, 0.0), axis="none"):
+    return {"t": "tel", "far": list(far), "beacon": beacon, "edge": list(edge), "tilt": list(tilt), "bat": [7.4, 1.0],
+            "axis": axis}
 
 
 class Run:
@@ -151,7 +152,7 @@ def beacon_at(target, lag=0.0):
         h = r.history[max(0, len(r.history) - 1 - round(lag / DT))]
         b = (target - h + 180) % 360 - 180
         if abs(b) <= 40:
-            return tel(beacon="ahead")
+            return tel(beacon="ahead", axis="on")
         if abs(b) <= 70:
             return tel(beacon="left" if b > 0 else "right")
         return tel(beacon="none")
@@ -162,11 +163,7 @@ def beacon_at(target, lag=0.0):
 def test_home_turns_to_face_the_beacon(target):
     r = Run("home")
     world = beacon_at(target)
-    for _ in range(600):
-        r.go(DT, telem=world)
-        if r.b.state == "home_approach":
-            break
-    assert r.b.state == "home_approach"
+    assert r.until("home_axis", telem=world) == "home_axis"
     assert (target - r.heading + 180) % 360 - 180 == pytest.approx(0, abs=4)
 
 
@@ -174,7 +171,7 @@ def test_home_turns_to_face_the_beacon(target):
 def test_home_centering_cancels_the_beacon_delay(target):
     r = Run("home")
     world = beacon_at(target, lag=0.1)                     # RP2350 считает пачки окнами по 100 мс
-    assert r.until("home_approach", telem=world) == "home_approach"
+    assert r.until("home_axis", telem=world) == "home_axis"
     assert (target - r.heading + 180) % 360 - 180 == pytest.approx(0, abs=1.2)
 
 
@@ -189,54 +186,20 @@ def test_home_approach_holds_the_heading_against_drift():
     approach(r)
     h0 = r.heading
     r.drift = 4.0
-    r.go(3.0, telem=lambda r: tel(beacon="ahead"))
+    r.go(3.0, telem=lambda r: tel(beacon="ahead", axis="on"))
     assert r.heading == pytest.approx(h0, abs=3) and r.cmds[-1]["v"][2] < 0
 
 
-def tag(r):
-    """Камера видит метку на башенке: где корпус в системе станции."""
-    return {"dock": {"x_mm": r.x, "y_mm": r.y, "yaw_deg": r.heading}}
 
 
-def test_home_by_the_tag_lines_up_on_the_station_axis_first():
-    r = Run("home")
-    r.x, r.y, r.heading = -320.0, 70.0, 25.0
-    assert r.until("home_approach", vision=tag) == "home_approach"
-    assert r.x == pytest.approx(-250, abs=10) and abs(r.y) < 2.5 and abs(r.heading) < 1.5
 
 
-def test_home_approach_corrects_sideways_slip_by_the_tag():
-    r = Run("home")
-    r.x = -250.0
-    r.until("home_approach", vision=tag)
-    r.slip = 6.0
-    r.go(3.0, telem=lambda r: tel(beacon="ahead"), vision=tag)
-    assert abs(r.y) < 3 and r.cmds[-1]["v"][1] < 0
 
 
-def test_home_by_the_beacon_switches_to_the_tag_once_it_is_in_view():
-    r = Run("home")
-    r.go(0.2, telem=beacon_at(30))
-    assert r.b.state == "home_center"
-    r.go(0.1, telem=beacon_at(30), vision=tag)
-    assert r.b.state == "home_align"
 
 
-def test_home_approach_far_off_the_axis_lines_up_again():
-    r = Run("home")
-    approach(r)
-    r.x, r.y = -200.0, 40.0
-    r.go(0.1, telem=lambda r: tel(beacon="ahead"), vision=tag)
-    assert r.b.state == "home_align"
 
 
-def test_home_tag_lost_while_lining_up_searches_again():
-    r = Run("home")
-    r.x, r.y = -320.0, 70.0
-    r.go(0.5, vision=tag)
-    assert r.b.state == "home_align"
-    r.go(1.2)
-    assert r.b.state == "home_search"
 
 
 def pad_then_tower(r):
@@ -250,13 +213,15 @@ def pad_then_tower(r):
         d = 70
     else:
         d = 70 - 6 * (t - 4.0) / 0.5
-    return tel(beacon="ahead", edge=(d, d, 72, 72, 104, 104))
+    return tel(beacon="ahead", axis="on", edge=(d, d, 72, 72, 104, 104))
 
 
 def approach(r):
-    r.go(0.05, telem=beacon_at(0))
-    while r.b.state != "home_approach":
-        r.go(DT, telem=beacon_at(0))
+    """Сразу на заход: Харви уже на оси и смотрит на станцию."""
+    r.b.on_axis = True
+    r.b._faced(r.t)
+    r.go(DT, telem=beacon_at(0))
+    assert r.b.state == "home_approach"
     r.t_approach = r.t
 
 
@@ -274,7 +239,8 @@ def test_home_stops_over_the_contacts_after_pad_then_tower_and_lies_down():
 
 def lie_down(r):
     approach(r)
-    while r.cmds[-1]["pose"] != "lie":
+    end = r.t + 30
+    while r.cmds[-1]["pose"] != "lie" and r.t < end:
         r.go(DT, telem=pad_then_tower)
 
 
@@ -291,7 +257,9 @@ def test_no_charge_after_lying_retries_once_then_fails():
     r.go(3.2)
     retry = r.go(0.2)
     assert retry["pose"] == "stand" and retry["v"][0] < 0
-    r.go(2.2)
+    r.go(4.6)
+    assert r.b.state == "home_retry"                       # отходит 5 с — на 20 см, чтобы снова увидеть площадку
+    r.go(0.4)
     assert r.b.state == "home_search"
     lie_down(r)
     r.go(3.4)
@@ -344,27 +312,10 @@ def test_search_turns_on_the_spot():
     assert Run("home").go(0.3)["v"] == (0, 0, 30.0)
 
 
-def test_tag_briefly_lost_while_lining_up_is_waited_for():
-    r = Run("home")
-    r.x, r.y = -320.0, 70.0
-    r.go(0.2, vision=tag)
-    assert r.go(0.8)["state"] == "home_align"
 
 
-def test_lining_up_steps_forward_and_sideways_toward_the_axis():
-    r = Run("home")
-    r.x, r.y = -320.0, 70.0
-    cmd = r.go(DT, vision=tag)
-    cmd = r.go(DT, vision=tag)
-    assert cmd["v"][0] == 40.0 and cmd["v"][1] == -30.0 and cmd["v"][2] == 0
 
 
-def test_lining_up_when_turned_converts_the_error_into_body_axes():
-    r = Run("home")
-    r.x, r.y, r.heading = -250.0, 20.0, 90.0                     # стоит на 20 мм левее оси, смотрит налево
-    r.go(DT, vision=tag)
-    vx, vy, wz = r.go(DT, vision=tag)["v"]
-    assert vx == pytest.approx(-30.0) and abs(vy) < 1e-9 and wz == -20.0   # ось — за спиной: назад и поворот направо
 
 
 def test_charging_current_alone_means_docked():
@@ -382,9 +333,103 @@ def test_search_counts_the_full_circle_from_where_it_started():
     assert r.b.state == "home_search"
 
 
-def test_home_approach_turns_back_onto_the_axis_by_the_tag():
+
+
+# ---------- домой: метка (направление и расстояние) и маяк с двумя светодиодами ----------
+LED_X, TAG_X, WEDGE_D, FIN_L, RX_X, CONE = 144.0, 140.0, 3.5, 46.5, 71.0, 50.0   # мм и ° — как станция в CAD
+
+
+def wrap(a):
+    return (a + 180) % 360 - 180
+
+
+def station(r):
+    """Телеметрия у станции: боковые приёмники — куда маяк, центральный — по какую сторону оси (клин за перегородкой),
+    передние датчики края — площадка, стол, башенка."""
+    b = wrap(math.degrees(math.atan2(-r.y, LED_X - r.x)) - r.heading)
+    beacon = "ahead" if abs(b) <= 40 else ("left" if b > 0 else "right") if abs(b) <= 70 else "none"
+    h = math.radians(r.heading)
+    xr, yr = r.x + RX_X * math.cos(h), r.y + RX_X * math.sin(h)
+    w = WEDGE_D * ((LED_X - xr) / FIN_L - 1)
+    in_beams = abs(math.degrees(math.atan2(yr, LED_X - xr))) <= CONE and abs(b) <= 60
+    axis = ("on" if abs(yr) < w else "left" if yr > 0 else "right") if in_beams else "none"
+    land = r.x + 132
+    d = 59 if -32 <= land <= 32 else (70 - (land - 140)) if land > 140 else 70
+    return tel(beacon=beacon, axis=axis, edge=(d, d, 72, 72, 104, 104))
+
+
+def tag(r):
+    dx, dy = TAG_X - r.x, -r.y
+    b = wrap(math.degrees(math.atan2(dy, dx)) - r.heading)
+    return {"dock": {"bearing_deg": b, "dist_mm": math.hypot(dx, dy)}} if abs(b) < 50 and math.hypot(dx, dy) < 600 else {}
+
+
+def charged(r):
+    return ["docked"] if r.b.state == "home_lie" and abs(r.y) < 3.5 and abs(r.x) < 17.5 else []
+
+
+STARTS = [(-300, 60, 30), (-250, -50, -60), (-200, 0, 120), (-320, 90, 0), (-180, -20, -170)]
+
+
+@pytest.mark.parametrize("start", STARTS)
+def test_home_in_the_dark_by_the_two_led_beacon(start):
     r = Run("home")
-    r.x = -250.0
-    r.until("home_approach", vision=tag)
-    r.heading = 3.0
-    assert r.go(DT, telem=lambda r: tel(beacon="ahead"), vision=tag)["v"][2] < 0
+    r.x, r.y, r.heading = start
+    r.until("docked", limit=120.0, telem=station, events=charged)
+    assert r.b.state == "docked" and abs(r.y) < 3.5
+
+
+@pytest.mark.parametrize("start", STARTS)
+def test_home_in_the_light_with_the_tag(start):
+    r = Run("home")
+    r.x, r.y, r.heading = start
+    r.until("docked", limit=120.0, telem=station, events=charged, vision=tag)
+    assert r.b.state == "docked" and abs(r.y) < 3.5
+
+
+def test_home_in_the_dark_holds_the_axis_against_drift():
+    r = Run("home")
+    r.x, r.y, r.heading = -300.0, 30.0, 10.0
+    r.drift, r.slip = 1.5, 1.5                             # снос втрое больше, чем в симуляции (4 мм за 8 с)
+    r.until("docked", limit=120.0, telem=station, events=charged)
+    assert r.b.state == "docked" and abs(r.y) < 3.5
+
+
+def test_tag_in_view_faces_the_station_first():
+    r = Run("home")
+    r.x, r.y, r.heading = -250.0, 0.0, 20.0
+    r.go(0.1, telem=station, vision=tag)
+    assert r.b.state == "home_face" and r.cmds[-1]["v"][2] < 0
+
+
+def test_left_of_the_axis_steps_right_and_keeps_facing_the_station():
+    r = Run("home")
+    r.b._faced(r.t)
+    cmd = r.go(DT, telem=lambda r: tel(beacon="ahead", axis="left"), vision=lambda r: {"dock": {"bearing_deg": 0.0, "dist_mm": 300}})
+    assert cmd["v"][0] == 0 and cmd["v"][1] < 0 and cmd["v"][2] > 0
+
+
+def test_approach_losing_the_beams_goes_back_to_finding_the_axis():
+    r = Run("home")
+    r.b._go("home_approach", r.t, ref=None, step="pad", lost=None)
+    r.go(1.2, telem=lambda r: tel(beacon="ahead", axis="none"))
+    assert r.b.state == "home_axis"
+
+
+def test_flicker_at_the_pad_edge_is_not_taken_for_the_tower():
+    def flicker(r):
+        t = r.t - r.t_approach
+        d = 70 if t < 1.0 else 58 if t < 2.5 else (70 if int(t * 20) % 2 else 59) if t < 3.0 else 70
+        return tel(beacon="ahead", axis="on", edge=(d, d, 72, 72, 104, 104))
+    r = Run("home")
+    approach(r)
+    r.go(4.0, telem=flicker)
+    assert r.b.state == "home_approach"
+
+
+def test_wedge_edges_are_measured_where_the_receiver_is():
+    r = Run("home")
+    r.b._go("home_axis", r.t, lat=0.0, vy=0.0, edges=[], inside=None)
+    r.b.heading = 3.0
+    r.b.data["h_ref"] = 0.0
+    assert r.b._receiver_lat() == pytest.approx(71.0 * math.sin(math.radians(3.0)), abs=0.01)

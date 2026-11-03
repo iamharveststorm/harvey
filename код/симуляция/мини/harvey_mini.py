@@ -86,7 +86,9 @@ def dock_xml(visual, pos=None):
     h, top = CAD["dock_h"] * mm, CAD["pogo_top"] * mm
     DX, DY = pos if pos is not None else (DOCK_X, 0.0)
     g = [f'<geom name="dock_pad" type="box" size="0.030 0.026 {h / 2}" pos="{DX} {DY} {h / 2}" rgba=".3 .3 .32 1" group="1"/>',
-         f'<geom name="dock_tower" type="box" size="0.004 0.030 0.026" pos="{DX + 0.144} {DY} 0.026" rgba=".3 .3 .32 1" group="1"/>']
+         f'<geom name="dock_tower" type="box" size="0.004 0.030 0.0335" pos="{DX + 0.144} {DY} 0.0335" rgba=".3 .3 .32 1" group="1"/>',
+         # перегородка между светодиодами маяка (CAD: FIN): x 97,5…140 мм, высотой 31 мм — ниже метки
+         f'<geom name="dock_fin" type="box" size="0.02125 0.00075 0.0155" pos="{DX + 0.11875} {DY} 0.0155" rgba=".3 .3 .32 1" group="1"/>']
     for i, y in enumerate(CAD["belly_y"]):
         g.append(f'<geom name="pogo{i}" type="cylinder" size="0.0025 {(top - h) / 2}" pos="{DX} {DY + y * mm} {h + (top - h) / 2}" '
                  f'solref="0.02 0.7" solimp="0.5 0.9 0.0015" rgba=".85 .7 .3 1" group="1"/>')

@@ -7,7 +7,7 @@ IMU — `read() → (ускорение g, вращение °/с)`, INA226 — 
 Числа — из документы/:
 - TSAL6200: сила излучения 72 мВт/ср (тип.) при 100 мА, угол половинной силы ±17° (стр. 2);
 - TSOP382: порог 0,25 мВт/м² (NEC, макс.), предел 30 Вт/м², половинная дальность ±45° (стр. 2–3);
-- маяк: пик 105 мА, 508 пачек/с (схемы/README.md, «Станция»).
+- маяк: два светодиода по очереди, 333 пачки/с каждый (код/прошивка/станция/beacon_station.py); пик ~110 мА.
 ПРЕДВАРИТЕЛЬНО: угловые кривые — cos^n по этим точкам, а не по рисункам даташитов; сила излучения при 105 мА — линейно
 от 100 мА. Датчик края — один луч, а у VL53L4CD конус 18°. Проверить на стенде.
 """
@@ -115,17 +115,19 @@ class SimIna:
 
 
 # ---------- ИК-маяк: TSAL6200 на станции, 2 × TSOP38238 у передней стенки ----------
-IE_MW_SR = 72.0 * 105 / 100                         # сила излучения при пике 105 мА, мВт/ср
+IE_MW_SR = 72.0 * 110 / 100                         # сила излучения при пике ~110 мА, мВт/ср
 N_LED = math.log(0.5) / math.log(math.cos(math.radians(17)))   # cos^n: половина силы на ±17°
 N_RX = 4                                            # чувствительность ∝ cos⁴: половинная дальность на ±45° (дальность ∝ √E)
 EE_MIN, EE_MAX = 0.25, 30000.0                      # мВт/м²
-BURSTS = round(508 * 0.1)                           # пачек за окно 100 мс
-LED = (0.144, 0.0, 0.049)                           # ИК-светодиод в стенке башенки от центра площадки (CAD: DOCK_LED)
+BURSTS = round(333 * 0.1)                           # пачек одного светодиода за окно 100 мс
+# светодиоды в стенке башенки у самого низа, по бокам перегородки (от центра площадки, м): левый — +y
+LEDS = {"L": (0.144, 0.0035, 0.012), "R": (0.144, -0.0035, 0.012)}   # CAD: DOCK_LEDS
 IR_Y, IR_Z, IR_SPLAY = 0.022, -0.006, math.radians(30)   # как ir_axis в модели/мини/harvey_mini_parts.py
+IR_C_Z = 0.0                                        # центральный приёмник — под объективом камеры (CAD: IR_C_Z)
 
 
-def led_world(dock_pos):
-    return np.array([dock_pos[0] + LED[0], dock_pos[1] + LED[1], LED[2]])
+def leds_world(dock_pos):
+    return {k: np.array([dock_pos[0] + v[0], dock_pos[1] + v[1], v[2]]) for k, v in LEDS.items()}
 
 
 def receiver_sees(ee, phi):
@@ -144,26 +146,32 @@ def irradiance(led, p):
 
 
 def receivers(sg):
+    """(точка, ось) приёмника: sg = 1 — слева, 0 — по центру (под камерой, смотрит вперёд), −1 — справа."""
+    if sg == 0:
+        return (hm.BX1 + 0.002 + 0.0048, 0.0, IR_C_Z), (1.0, 0.0, 0.0)
     a = sg * IR_SPLAY
     return (hm.BX1 + 0.002 + 0.0048 * math.cos(a), sg * IR_Y + 0.0048 * math.sin(a), IR_Z), (math.cos(a), math.sin(a), 0.0)
 
 
 class SimBeacon:
-    def __init__(self, sim, led):
-        self.sim, self.led = sim, np.asarray(led)
+    """Два светодиода станции и три приёмника Харви; тень перегородки и всего прочего — лучом MuJoCo."""
 
-    def _sees(self, sg):
+    def __init__(self, sim, dock_pos):
+        self.sim, self.leds = sim, leds_world(dock_pos)
+
+    def _sees(self, sg, led):
         p, ax = _body_ray(self.sim, *receivers(sg))
-        to_led = self.led - p
+        to_led = led - p
         r = float(np.linalg.norm(to_led))
         dist, _ = _ray(self.sim, p, to_led / r, SOLID, -1)
         if 0 <= dist < r - 0.006:                       # луч упёрся во что-то раньше светодиода (светодиод в стенке 4 мм)
             return False
         phi = math.acos(max(-1.0, min(1.0, float(np.dot(to_led / r, ax)))))
-        return receiver_sees(irradiance(self.led, p), phi)
+        return receiver_sees(irradiance(led, p), phi)
 
     def take(self):
-        return tuple(BURSTS if self._sees(sg) else 0 for sg in (1, -1))
+        """((слева L, R), (по центру L, R), (справа L, R)) — как Beacon.take в прошивке."""
+        return tuple(tuple(BURSTS if self._sees(sg, self.leds[k]) else 0 for k in "LR") for sg in (1, 0, -1))
 
 
 # ---------- шины приводов ----------
@@ -231,14 +239,15 @@ def see_hand(sim, body="hand"):
     return {"bearing_deg": round(math.degrees(seen[0]), 1), "dist_mm": round(seen[1] * 1000)}
 
 
-# метка AprilTag 30 × 30 мм в окне башенки (CAD dock_tower: окно x 139,5…141, y ±16, z 14…46 от центра площадки);
-# смотрит по −x. Предварительно: читается, если камера видит её не круче 70° к нормали; точность позы не моделируется
-TAG = (0.140, 0.0, 0.030)
+# метка AprilTag 30 × 30 мм в окне башенки (над перегородкой маяка); смотрит по −x.
+# Предварительно: читается, если камера видит её не круче 70° к нормали. Как и harvey_head/dock_tag.py, даёт только
+# направление и расстояние: угол, под которым видна маленькая метка, камера на деле не различает
+TAG = (0.140, 0.0, 0.048)                           # CAD: окно метки z 33…63 мм
 TAG_MAX_ANGLE = math.radians(70)
 
 
 def see_tag(sim, dock_pos):
-    """{"x_mm", "y_mm", "yaw_deg"} — где корпус в системе станции (0 — над контактами, x — к башенке), если метка в кадре."""
+    """{"bearing_deg": + — слева, "dist_mm": по столу от центра корпуса} до метки, если она в кадре и видна; иначе None."""
     target = np.array([dock_pos[0] + TAG[0], dock_pos[1] + TAG[1], TAG[2]])
     seen = _in_frame(sim, target)
     if seen is None:
@@ -248,10 +257,10 @@ def see_tag(sim, dock_pos):
         return None
     if _first_body(sim, seen[2], target, seen[1]) not in (None, 0):          # 0 — мир: станция вкопана в мир
         return None
-    tb = sim.d.body("torso"); q = tb.xquat
-    yaw = math.atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] ** 2 + q[3] ** 2))
-    return {"x_mm": round((tb.xpos[0] - dock_pos[0]) * 1000, 1), "y_mm": round((tb.xpos[1] - dock_pos[1]) * 1000, 1),
-            "yaw_deg": round(math.degrees(yaw), 1)}
+    if _ray(sim, seen[2], (target - seen[2]) / seen[1], SOLID)[0] < seen[1] - 0.005:   # перегородка или что-то ещё
+        return None
+    rel = sim.to_body(target)
+    return {"bearing_deg": round(math.degrees(math.atan2(rel[1], rel[0])), 2), "dist_mm": round(math.hypot(rel[0], rel[1]) * 1000, 1)}
 
 
 # ---------- мир ----------

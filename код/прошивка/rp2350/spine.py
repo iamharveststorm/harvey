@@ -74,7 +74,7 @@ class Spine:
         if self.beacon is not None:
             from beacon import axis_side, bearing
             self.ir = self.beacon.take()
-            self.beacon_dir = bearing(sum(self.ir[0]), sum(self.ir[2]))
+            self.beacon_dir = bearing(max(self.ir[0]), max(self.ir[2]))     # по самому заметному светодиоду
             self.axis = axis_side(*self.ir[1])
 
     # ---------- приводы ----------
