@@ -6,7 +6,7 @@ import vl53l4cd
 
 
 class FakePin:
-    IN, OUT, PULL_UP, IRQ_FALLING = 0, 1, 2, 4
+    IN, OUT, PULL_UP, IRQ_FALLING, IRQ_RISING = 0, 1, 2, 4, 8
 
     def __init__(self, level=0):
         self.level, self.handler = level, None
@@ -22,6 +22,15 @@ class FakePin:
     def pulse(self, n=1):
         for _ in range(n):
             self.handler(self)
+
+    def burst(self, clock, width_us, gap_us=600):
+        """Выход TSOP: 0 на время пачки, потом 1 (прерывание на оба фронта)."""
+        self.level = 0
+        self.handler(self)
+        clock[0] += width_us
+        self.level = 1
+        self.handler(self)
+        clock[0] += gap_us
 
 
 class FakeI2C:

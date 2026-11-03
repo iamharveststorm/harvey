@@ -38,7 +38,7 @@ class Ina:
 
 class Beacon:
     def __init__(self):
-        self.next = (0, 0)
+        self.next = ((0, 0), (0, 0), (0, 0))
 
     def take(self):
         return self.next
@@ -130,13 +130,14 @@ def test_docking_is_reported_when_charge_current_flows():
 
 def test_telemetry_twenty_times_a_second():
     sp, p, devs, clock = make()
-    p["beacon"].next = (40, 10)
+    p["beacon"].next = ((20, 20), (25, 0), (5, 5))
     step(sp, clock, ms=10, n=30)                                      # 300 мс
     tel = p["port"].of("tel")
     assert len(tel) == 6
     last = tel[-1]
     assert last["edge"] == [80] * 6 and last["far"] == [0] * 6 and last["bat"] == [7.6, 0.8]
-    assert last["beacon"] == "left" and last["ir"] == [40, 10] and last["tilt"] == [0.0, 0.0]
+    assert last["beacon"] == "left" and last["ir"] == [[20, 20], [25, 0], [5, 5]] and last["tilt"] == [0.0, 0.0]
+    assert last["axis"] == "left"
 
 
 def test_hello_reports_missing_devices():

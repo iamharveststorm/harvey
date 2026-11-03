@@ -24,7 +24,7 @@ class Spine:
         self.acc, self.gyr, self.tilt = (0.0, 0.0, 1.0), (0.0, 0.0, 0.0), (0.0, 0.0)
         self.bat = (0.0, 0.0)
         self.bat_level, self.docked, self.relaxed, self.was_blocked, self.was_lifted = "unknown", False, False, False, False
-        self.ir, self.beacon_dir = (0, 0), "none"
+        self.ir, self.beacon_dir, self.axis = ((0, 0), (0, 0), (0, 0)), "none", "none"
         now = clock()
         self.t_imu = self.t_slow = self.t_tel = now
 
@@ -72,9 +72,10 @@ class Spine:
                 self.event("docked", round(self.bat[1], 2))
             self.docked = docked
         if self.beacon is not None:
-            from beacon import bearing
+            from beacon import axis_side, bearing
             self.ir = self.beacon.take()
-            self.beacon_dir = bearing(*self.ir)
+            self.beacon_dir = bearing(sum(self.ir[0]), sum(self.ir[2]))
+            self.axis = axis_side(*self.ir[1])
 
     # ---------- приводы ----------
     def relax_all(self):
@@ -144,5 +145,6 @@ class Spine:
         return {"t": "tel", "ms": now, "edge": self.dist, "far": [int(f) for f in self.far],
                 "tilt": [round(a, 1) for a in self.tilt], "acc": [round(a, 3) for a in self.acc],
                 "gyr": [round(g, 1) for g in self.gyr],
-                "bat": [round(self.bat[0], 2), round(self.bat[1], 3)], "ir": list(self.ir), "beacon": self.beacon_dir,
+                "bat": [round(self.bat[0], 2), round(self.bat[1], 3)], "ir": [list(c) for c in self.ir], "beacon": self.beacon_dir,
+                "axis": self.axis,
                 "relaxed": int(self.relaxed)}

@@ -11,7 +11,7 @@ except ImportError:                                  # ПК
 
 try:
     sleep_ms, sleep_us = time.sleep_ms, time.sleep_us
-    ticks_ms, ticks_diff = time.ticks_ms, time.ticks_diff
+    ticks_ms, ticks_us, ticks_diff = time.ticks_ms, time.ticks_us, time.ticks_diff
 except AttributeError:                               # ПК
     def sleep_ms(ms):
         time.sleep(ms / 1000)
@@ -21,6 +21,9 @@ except AttributeError:                               # ПК
 
     def ticks_ms():
         return int(time.monotonic() * 1000)
+
+    def ticks_us():
+        return int(time.monotonic() * 1000000)
 
     def ticks_diff(a, b):
         return a - b

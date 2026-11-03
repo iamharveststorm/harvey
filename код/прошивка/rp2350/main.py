@@ -59,7 +59,7 @@ def build():
         dev.alert_below(pins.BAT_CRITICAL_V)
         return dev
 
-    beacon = Beacon(Pin(pins.IR_LEFT, Pin.IN, Pin.PULL_UP), Pin(pins.IR_RIGHT, Pin.IN, Pin.PULL_UP))
+    beacon = Beacon(*(Pin(p, Pin.IN, Pin.PULL_UP) for p in (pins.IR_LEFT, pins.IR_CENTER, pins.IR_RIGHT)))
     cfg = {"bat_low": pins.BAT_LOW_V, "bat_critical": pins.BAT_CRITICAL_V, "telemetry_ms": pins.TELEMETRY_MS,
            "edge_names": pins.EDGE_NAMES}
     return dict(buses=buses, edge=edge, imu=try_make(imu), ina=try_make(ina), beacon=beacon, cfg=cfg)

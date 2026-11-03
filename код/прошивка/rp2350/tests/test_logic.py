@@ -101,13 +101,28 @@ def test_bearing(left, right, where):
     assert beacon.bearing(left, right) == where
 
 
-def test_beacon_counts_pulses_per_window(monkeypatch):
+@pytest.mark.parametrize("width, code", [(600, "L"), (470, "L"), (1200, "R"), (1330, "R"), (200, None), (2500, None)])
+def test_burst_length_tells_the_led(width, code):
+    assert beacon.code_of(width) == code              # TSOP382: tpo = tpi ± 5/f0 = ±132 мкс (стр. 3)
+
+
+def test_beacon_counts_codes_per_receiver_per_window(monkeypatch):
     monkeypatch.setattr(beacon, "Pin", FakePin)
-    lp, rp = FakePin(), FakePin()
-    b = beacon.Beacon(lp, rp)
-    lp.pulse(30)
-    rp.pulse(5)
-    assert b.take() == (30, 5) and b.take() == (0, 0)
+    clock = [0]
+    lp, cp, rp = FakePin(1), FakePin(1), FakePin(1)
+    b = beacon.Beacon(lp, cp, rp, clock_us=lambda: clock[0])
+    for _ in range(5):
+        lp.burst(clock, 600)
+        lp.burst(clock, 1200)
+        cp.burst(clock, 620)
+    rp.burst(clock, 1180)
+    rp.burst(clock, 3000)                               # помеха — не пачка маяка
+    assert b.take() == ((5, 5), (5, 0), (0, 1)) and b.take() == ((0, 0), (0, 0), (0, 0))
+
+
+@pytest.mark.parametrize("left, right, side", [(30, 30, "on"), (30, 0, "left"), (2, 30, "right"), (3, 4, "none")])
+def test_center_receiver_tells_which_side_of_the_station_axis(left, right, side):
+    assert beacon.axis_side(left, right) == side
 
 
 # ---------- протокол ----------
