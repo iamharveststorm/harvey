@@ -13,8 +13,9 @@ CAL_AFTER_S = 1.5
 
 
 class Body:
-    def __init__(self, spine, behavior, gait, vision=None, now: float = 0.0, hz: float = HZ):
+    def __init__(self, spine, behavior, gait, vision=None, now: float = 0.0, hz: float = HZ, cal=None):
         self.spine, self.behavior, self.gait, self.vision = spine, behavior, gait, vision
+        self.cal = cal or servos.Calibration()             # нули и направления приводов (servo_calib.json)
         self.period = 1.0 / hz
         self.tel: dict = {}
         self.events: list[str] = []
@@ -41,7 +42,7 @@ class Body:
         seen = self.vision(now) if self.vision else {}
         cmd = self.behavior.update(self.tel, self.events, seen, now)
         self.events = []
-        self.spine.send(servos.message(self.gait.step(cmd, min(dt, 2 * self.period)), self.gait.velocity()))
+        self.spine.send(servos.message(self.gait.step(cmd, min(dt, 2 * self.period)), self.gait.velocity(), self.cal))
         if not self.calibrated and now - self.t_first_tel >= CAL_AFTER_S:
             self.spine.send({"t": "cal"})
             self.calibrated = True

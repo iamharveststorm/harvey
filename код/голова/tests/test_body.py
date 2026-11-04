@@ -128,3 +128,11 @@ def test_dock_camera_finds_the_tag_a_few_times_a_second():
 def test_dock_camera_without_a_tag_sees_nothing():
     cam = DockCamera(lambda: np.full((720, 1280), 128, np.uint8), np.eye(3), every_s=0.2)
     assert cam.vision(0.0) == {"dock": None}
+
+
+def test_targets_use_the_servo_calibration():
+    from harvey_head.servos import Calibration
+    spine = Spine()
+    body = Body(spine, Behavior(0.0), Gait(), now=0.0, cal=Calibration({"LF_c": 1000}, {"LF_c": -1}))
+    run(body, 0.1, tel_msg=tel())
+    assert spine.of("j")[-1]["q"]["11"] == 1000                        # поворот ноги в стойке — 0°

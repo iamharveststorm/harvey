@@ -253,3 +253,11 @@ def test_beacon_ahead_when_each_side_sees_a_led_even_if_one_sees_both():
     p["beacon"].next = ((33, 33), (33, 33), (0, 33))                # левый видит оба светодиода, правый — один
     step(sp, clock, ms=10, n=12)
     assert p["port"].of("tel")[-1]["beacon"] == "ahead"
+
+
+
+def test_positions_on_request_for_calibration():
+    sp, p, _, clock = make(buses={"A": FakeBus(positions={12: 2100}), "B": FakeBus(), "C": FakeBus(positions={71: 1500})})
+    p["port"].push({"t": "pos?", "ids": [12, 71, 45]})
+    step(sp, clock)
+    assert p["port"].of("pos")[-1] == {"t": "pos", "q": {"12": 2100, "71": 1500}, "missing": [45]}

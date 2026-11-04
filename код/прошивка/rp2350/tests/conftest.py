@@ -1,10 +1,10 @@
-"""Прошивка на ПК: файлы прошивки и шины (код/прошивка/pico) — в пути импорта, machine — подмена с FakePin."""
+"""Прошивка на ПК: файлы прошивки, шины (код/прошивка/pico) и маяка станции — в пути импорта, machine — подмена с FakePin."""
 import sys
 import types
 from pathlib import Path
 
 HERE = Path(__file__).absolute().parent            # без resolve(): mutator подменяет файлы ссылками
-sys.path[:0] = [str(HERE), str(HERE.parent), str(HERE.parents[1] / "pico")]
+sys.path[:0] = [str(HERE), str(HERE.parent), str(HERE.parents[1] / "pico"), str(HERE.parents[1] / "станция")]
 
 from fakes import FakePin  # noqa: E402
 

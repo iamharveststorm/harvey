@@ -712,7 +712,7 @@ PARTS_G = {"STS3032 × 28": 28 * 20.0, "2 × 18650": 2 * 47.0, "Pi Zero 2 W": 11
 def printed_mass():
     out = {}
     for k, (fn, n, mat) in PRINTED.items():
-        if k.startswith("dock") or k == "leg_stand": continue   # станция и стенд — не на роботе
+        if k.startswith(("dock", "calib")) or k == "leg_stand": continue   # станция, стенд и подставка — не на роботе
         v = fn().volume()
         out[k] = round(v * (TPU if mat == "TPU" else PLA * INFILL) * n, 1)
     return out
@@ -736,6 +736,67 @@ def check_dock(verbose=True):
                      "ноги × станция мм³": round(inter(U(legs), pad), 1), "клешни × станция мм³": round(inter(U(claws), pad), 1),
                      "зазор брюхо — контакты мм": round(zj + G["body"][4] - POGO_TOP, 1)}
     if verbose: print("станция:", out)
+    return out
+
+
+# ---------------- калибровочная подставка ----------------
+# Поза A для калибровки нулей приводов (код/голова/harvey_head/calibrate.py): ноги — поворот 0, бедро горизонтально,
+# голень отвесно (стопа в гнезде плиты), корпус на опоре; клешни: плечо прямо и горизонтально, предплечье отвесно вниз,
+# губки сомкнуты до упора и стоят кончиком на столбике (так подставка помещается на стол принтера 220 × 220);
+# стебельки глаз вертикально. Углы — в mini_geometry.json (export_head).
+CALIB_LEG, CALIB_CLAW, CALIB_EYE = (0.0, 0.0, -90.0), (0.0, 0.0, -90.0, 12.0), 0.0
+JIG_PLATE, JIG_POCKET = 3.0, 2.0
+
+
+def calib_feet():
+    """(x, y) стоп в позе A, мм (система корпуса)."""
+    out = {}
+    for n, (x, y, yaw) in G["mounts"].items():
+        r = G["cox"] + G["fem"]
+        out[n] = (x + r * math.cos(math.radians(yaw)), y + r * math.sin(math.radians(yaw)))
+    return out
+
+
+def calib_zj():
+    """Оси бедра над столом на подставке: низ стопы (48 мм под осью) — на дне гнезда."""
+    return JIG_PLATE - JIG_POCKET + G["tib"]
+
+
+@functools.lru_cache(None)
+def calib_jig():
+    """Подставка для калибровки нулей: плита с гнёздами под 6 стоп, опора под дно корпуса, 2 столбика под губки клешней.
+    Печать — плитой на стол."""
+    zj = calib_zj()
+    m = boxr(-90, 105, -108, 108, 0, JIG_PLATE)
+    for fx, fy in calib_feet().values():
+        m -= cyl(JIG_POCKET + 0.1, G["foot_r"] + 0.6, fx, fy, JIG_PLATE - JIG_POCKET / 2 + 0.05)
+    m += boxr(-12, 12, -10, 10, JIG_PLATE - 0.01, zj + G["body"][4])               # опора под дно — между кронштейнами ног
+    for sd in "LR":
+        _, _, tip = claw_points(sd, *CALIB_CLAW[:3])
+        hand = U([m_ for parts in claw_assembly(sd, *CALIB_CLAW).values() for _, m_ in parts])
+        top = zj + hand.bounding_box()[2]
+        m += boxr(tip[0] - 5, tip[0] + 5, tip[1] - 5, tip[1] + 5, JIG_PLATE - 0.01, top)
+    return m
+
+
+PRINTED["calib_jig"] = (calib_jig, 1, "PLA")
+
+
+def check_calib(verbose=True):
+    """Харви в позе A на подставке: что задевает (касание стоп, дна и кистей — норма, мм³ ≈ 0)."""
+    zj = calib_zj()
+    jig = calib_jig()
+    robot = U([m.translate([0, 0, zj]) for m in fixed_parts().values()])
+    legs = U([m.translate([0, 0, zj]) for n in G["mounts"] for parts in leg_assembly(n, *CALIB_LEG).values() for _, m in parts])
+    stance = U([m.translate([0, 0, zj]) for n in G["mounts"] for parts in leg_assembly(n, 0.0, *leg_pose_for_drop(0.0)).values()
+                for _, m in parts])
+    claws = U([m.translate([0, 0, zj]) for sd in "LR" for parts in claw_assembly(sd, *CALIB_CLAW).values() for _, m in parts])
+    out = {"корпус × подставка мм³": round(inter(robot, jig), 1), "ноги × подставка мм³": round(inter(legs, jig), 1),
+           "клешни × подставка мм³": round(inter(claws, jig), 1), "ноги × корпус сверх стойки мм³": round(inter(legs, robot) - inter(stance, robot), 1),
+           "клешни × корпус мм³": round(inter(claws, robot), 1), "клешни × ноги мм³": round(inter(claws, legs), 1), "оси бедра над столом мм": round(zj, 1),
+           "клешни разрешены": claw_ok(*CALIB_CLAW[:3])}
+    if verbose:
+        print("подставка:", out)
     return out
 
 
@@ -831,6 +892,7 @@ def export_head(path):
     """Размеры ног и поза «поджато» для походки головы (код/голова/harvey_head/gait.py) — мм и градусы."""
     data = {"cox": G["cox"], "fem": G["fem"], "tib": G["tib"], "foot_r": G["foot_r"], "mounts": G["mounts"],
             "stance_deg": 20.0, "tuck_deg": list(CLAW_TUCK[:3]), "rest_drop": REST_DROP,
+            "calib_deg": {"leg": list(CALIB_LEG), "claw": list(CALIB_CLAW), "eye": CALIB_EYE},
             "note": "выгружено из модели/мини/harvey_mini_parts.py (export_head) — не править руками"}
     json.dump(data, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return path
@@ -874,7 +936,7 @@ if __name__ == "__main__":
     fast = "--fast" in sys.argv
     print(json.dumps(mass_report(), ensure_ascii=False, indent=1))
     hits = check(fast)
-    check_dock(); check_beacon(); check_stand()
+    check_dock(); check_beacon(); check_stand(); check_calib()
     if not fast:
         print("STL:", export_stl())
         print("для симуляции:", export_sim(os.path.join(HERE, "..", "..", "код", "симуляция", "мини", "assets")))

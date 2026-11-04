@@ -8,6 +8,7 @@ from compat import ticks_diff, ticks_ms
 from imu_events import ImuEvents
 
 GOAL_POS = (42, 2)                                       # регистр цели STS (код/прошивка/pico/sts_bus.py)
+PRESENT_POS = (56, 2)                                    # текущая позиция STS (там же, STATE: 56–57 — позиция)
 CHARGE_A = -0.05                                         # ток через шунт ниже −50 мА — идёт заряд (знак проверить на стенде)
 
 
@@ -116,9 +117,23 @@ class Spine:
             self.relax_all()
         elif t == "cal" and self.edge is not None:
             self.send({"t": "cal", "base": self.edge.calibrate()})
+        elif t == "pos?":
+            self.send(self.positions(msg.get("ids", ())))
         elif t == "hello":
             self.send({"t": "hello", "v": link.VERSION, "missing": self.missing()})
         return t
+
+    def positions(self, ids):
+        """Где сейчас приводы (для калибровки нулей): {"t": "pos", "q": {id: позиция}, "missing": [молчащие]}."""
+        q, missing = {}, []
+        for sid in ids:
+            bus = self.buses.get(reflex.bus_of(int(sid)))
+            try:
+                data = bus.read(int(sid), PRESENT_POS)
+                q[str(sid)] = data[0] | (data[1] << 8)
+            except Exception:                            # нет шины, привод молчит или битый ответ
+                missing.append(sid)
+        return {"t": "pos", "q": q, "missing": missing}
 
     def missing(self):
         out = [name for name, dev in (("edge", self.edge), ("imu", self.imu), ("ina", self.ina), ("beacon", self.beacon))

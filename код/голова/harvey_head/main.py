@@ -15,6 +15,7 @@ from .eyes import render
 from .gait import Gait
 from .head import Head
 from .links import BrainLink, SpineLink
+from .servos import Calibration
 
 INIT_FILE = Path(__file__).absolute().parents[3] / "документы" / "GC9D01 — код запуска Waveshare 0.71.txt"
 
@@ -51,7 +52,8 @@ async def run(sim: bool) -> None:
     else:
         eyes, spine, pads, audio, _backlight, camera = hardware(config)
     now = time.monotonic()
-    body = Body(spine, Behavior(now), Gait(), vision=camera.vision if camera else None, now=now, hz=config.LOOP_HZ)
+    body = Body(spine, Behavior(now), Gait(), vision=camera.vision if camera else None, now=now, hz=config.LOOP_HZ,
+                cal=Calibration.load())                   # нет servo_calib.json — нули 2048: сначала калибровка
     head = Head(spine, eyes, brain, audio, now=now, telemetry_hz=config.TELEMETRY_TO_BRAIN_HZ, body=body, fps=config.FPS)
     stop = asyncio.Event()
     brain_task = asyncio.ensure_future(brain.run(stop))

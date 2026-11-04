@@ -45,6 +45,9 @@ class FakeI2C:
             raise OSError("ENODEV" if not live else "два устройства на 0x%02X" % addr)
         return live[0]
 
+    def scan(self):
+        return sorted({d.addr for d in self.devices if d.awake()})
+
     def readfrom_mem(self, addr, reg, n):
         return self._dev(addr).read8(reg, n)
 
@@ -182,8 +185,15 @@ class FakeVL53L4CD:
 class FakeBus:
     """Шина приводов для Spine: запоминает пакеты целей и отпускания."""
 
-    def __init__(self, fail=False):
+    def __init__(self, fail=False, positions=None):
         self.sync, self.released, self.fail = [], 0, fail
+        self.positions = positions or {}                   # привод → позиция (регистр 56, 2 байта, младший вперёд)
+
+    def read(self, sid, reg):
+        if sid not in self.positions:
+            raise OSError("привод %d молчит" % sid)
+        p = self.positions[sid]
+        return bytes([p & 0xFF, p >> 8])
 
     def sync_write(self, reg, values):
         self.sync.append((reg, dict(values)))
