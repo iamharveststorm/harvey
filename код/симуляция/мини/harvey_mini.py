@@ -18,6 +18,14 @@ import numpy as np
 import mujoco
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# походка и обратная задача ног — те же, что у головы робота (код/голова/harvey_head/gait.py): здесь их проверяют
+for _base in (os.path.abspath(__file__), os.path.realpath(__file__)):
+    _head = os.path.join(os.path.dirname(_base), "..", "..", "голова")
+    if os.path.exists(os.path.join(_head, "harvey_head", "gait.py")):
+        sys.path.insert(0, os.path.normpath(_head))
+        break
+from harvey_head import gait as HG  # noqa: E402
+GEO = HG.load()
 ADIR = os.path.join(HERE, "assets")
 CAD = json.load(open(os.path.join(ADIR, "mini_visual.json"), encoding="utf-8"))
 G, MS = CAD["G"], CAD["masses"]
@@ -204,20 +212,18 @@ def load_assets():
 
 
 # ---------------- кинематика ----------------
-def neutral(n, reach=REACH):
-    x, y, yaw = MOUNTS[n]; a = math.radians(yaw)
-    return np.array([x + reach * math.cos(a), y + reach * math.sin(a)])
+def neutral(n):
+    return np.array(HG.neutral(GEO, n)) * mm
 
 
 def leg_ik(n, p, h):
-    x, y, yaw = MOUNTS[n]; a = math.radians(yaw)
-    dx, dy = p[0] - x, p[1] - y
-    lx, ly = math.cos(a) * dx + math.sin(a) * dy, -math.sin(a) * dx + math.cos(a) * dy
-    qc = math.atan2(ly, lx); rr = math.hypot(lx, ly) - COX; L2 = TIB - FOOT_R
-    d = min(max(math.hypot(rr, h), abs(L2 - FEM) + 1e-4), FEM + L2 - 1e-4)
-    qf = math.atan2(h, rr) + math.acos(max(-1, min(1, (FEM ** 2 + d ** 2 - L2 ** 2) / (2 * FEM * d))))
-    qk = -(math.pi - math.acos(max(-1, min(1, (FEM ** 2 + L2 ** 2 - d ** 2) / (2 * FEM * L2)))))
-    return qc, qf, qk
+    """Обратная задача ноги головы (мм) в метрах симуляции."""
+    return HG.leg_ik(GEO, n, (p[0] / mm, p[1] / mm), h / mm)
+
+
+def feet_q(feet):
+    """Стопы (x, y, h мм) от походки головы → углы суставов ног."""
+    return {f"{n}_{j}": v for n, (x, y, h) in feet.items() for j, v in zip("cfk", HG.leg_ik(GEO, n, (x, y), h))}
 
 
 def arm_ik(s, p, tipx=JAW_MID):
@@ -313,17 +319,9 @@ class Mini:
         tb = self.d.body("torso"); R = tb.xmat.reshape(3, 3); return R.T @ (np.array(pw) - tb.xpos)
 
     def gait(self, vx=0.06, wz=0.0, t_half=0.30, lift=0.015, dz=0.0):
-        h0 = -(ZJ - FOOT_R) + dz
         def fn(t):
             ph = (t / (2 * t_half)) % 1.0
-            for n in MOUNTS:
-                p0 = neutral(n); pp = ph if n in TRIPOD_A else (ph + 0.5) % 1.0
-                if pp < 0.5: u = 0.5 - 2 * pp; z = 0.0
-                else:
-                    s_ = (pp - 0.5) * 2; u = -0.5 + (s_ - math.sin(2 * math.pi * s_) / (2 * math.pi)); z = lift * math.sin(math.pi * s_)
-                a = wz * t_half * u; c, sn = math.cos(a), math.sin(a)
-                p = np.array([c * p0[0] - sn * p0[1], sn * p0[0] + c * p0[1]]) + np.array([vx * t_half * u, 0])
-                for jj, v in zip("cfk", leg_ik(n, p, h0 + z)): self.q[f"{n}_{jj}"] = v
+            self.q.update(feet_q(HG.foot_targets(GEO, ph, (vx / mm, 0.0, wz), t_half, lift / mm, dz / mm)))
         return fn
 
     def crouch(self, dz, sec=0.6):
@@ -357,18 +355,8 @@ class Walker:
     def legs(self, dz=0.0, pitch=0.0, t_half=0.30):
         moving = np.linalg.norm(self.vel) > 1e-3
         if moving: self.phase = (self.phase + DT / (2 * t_half)) % 1.0
-        h0 = -(ZJ - FOOT_R) + dz
-        for n in MOUNTS:
-            p0 = neutral(n); z = 0.0; u = 0.0
-            if moving:
-                pp = self.phase if n in TRIPOD_A else (self.phase + 0.5) % 1.0
-                if pp < 0.5: u = 0.5 - 2 * pp
-                else:
-                    s_ = (pp - 0.5) * 2; u = -0.5 + (s_ - math.sin(2 * math.pi * s_) / (2 * math.pi)); z = self.lift * math.sin(math.pi * s_)
-            a = self.vel[2] * t_half * u; c, sn = math.cos(a), math.sin(a)
-            p = np.array([c * p0[0] - sn * p0[1], sn * p0[0] + c * p0[1]]) + self.vel[:2] * t_half * u
-            hp = math.tan(pitch) * p[0]
-            for jj, v in zip("cfk", leg_ik(n, p, h0 + z + hp)): self.sim.q[f"{n}_{jj}"] = v
+        vel = (self.vel[0] / mm, self.vel[1] / mm, self.vel[2])
+        self.sim.q.update(feet_q(HG.foot_targets(GEO, self.phase, vel, t_half, self.lift / mm, dz / mm, pitch, moving)))
 
 
 LEGS_F = [f"{n}_f" for n in MOUNTS]; LEGS_K = [f"{n}_k" for n in MOUNTS]; LEGS_C = [f"{n}_c" for n in MOUNTS]

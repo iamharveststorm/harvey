@@ -36,7 +36,7 @@ class Run:
                 vx, vy, _ = self.cmds[-1]["v"]
                 c, s = math.cos(math.radians(self.heading)), math.sin(math.radians(self.heading))
                 self.x += (vx * c - vy * s) * DT
-                self.y += (vx * s + vy * c + self.slip) * DT
+                self.y += (vx * s + vy * c + (self.slip if vx or vy else 0.0)) * DT   # сносит только на ходу
             msg = dict(telem(self), gyr=[0.0, 0.0, rate])
             cmd = self.b.update(msg, events(self), vision(self), self.t)
             self.wz = cmd["v"][2]
@@ -218,8 +218,7 @@ def pad_then_tower(r):
 
 def approach(r):
     """Сразу на заход: Харви уже на оси и смотрит на станцию."""
-    r.b.on_axis = True
-    r.b._faced(r.t)
+    r.b._go("home_approach", r.t, ref=None, step="pad", lost=None)
     r.go(DT, telem=beacon_at(0))
     assert r.b.state == "home_approach"
     r.t_approach = r.t
@@ -260,7 +259,7 @@ def test_no_charge_after_lying_retries_once_then_fails():
     r.go(4.6)
     assert r.b.state == "home_retry"                       # отходит 5 с — на 20 см, чтобы снова увидеть площадку
     r.go(0.4)
-    assert r.b.state == "home_search"
+    assert r.b.state == "home_axis"                        # стоит лицом к станции у оси — сразу снова на ось, без поиска
     lie_down(r)
     r.go(3.4)
     assert r.b.state == "home_failed" and r.cmds[-1]["v"] == (0, 0, 0)
@@ -427,9 +426,10 @@ def test_flicker_at_the_pad_edge_is_not_taken_for_the_tower():
     assert r.b.state == "home_approach"
 
 
-def test_wedge_edges_are_measured_where_the_receiver_is():
+def test_crossing_the_wedge_holds_the_heading_against_drift():
     r = Run("home")
-    r.b._go("home_axis", r.t, lat=0.0, vy=0.0, edges=[], inside=None)
-    r.b.heading = 3.0
-    r.b.data["h_ref"] = 0.0
-    assert r.b._receiver_lat() == pytest.approx(71.0 * math.sin(math.radians(3.0)), abs=0.01)
+    r.b._faced(r.t)
+    r.drift = 2.0
+    r.go(3.0, telem=lambda r: tel(beacon="ahead", axis="left"))
+    turn = math.degrees(25.0 / 400.0) * 3.0                          # доворот на шаг вбок за 3 с
+    assert r.heading == pytest.approx(turn, abs=1.5)

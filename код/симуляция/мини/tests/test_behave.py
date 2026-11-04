@@ -15,10 +15,10 @@ def test_home_in_the_light_with_the_tag_charges(start):
     assert r["state"] == "docked" and r["charging"] and r["t"] <= 60 and not r["fell"]
 
 
-@pytest.mark.parametrize("start", [mb.HOME_STARTS[i] for i in (0, 2, 4)])
+@pytest.mark.parametrize("start", [mb.HOME_STARTS[i] for i in (0, 5, 8)])          # 5, 8 — под 45° и 35°: раньше не доходили
 def test_home_in_the_dark_by_the_two_led_beacon_charges(start):
     r = mb.scenario_home(mb.start_at(*start), camera=False)
-    assert r["state"] == "docked" and r["charging"] and r["t"] <= 70 and not r["fell"]
+    assert r["state"] == "docked" and r["charging"] and r["t"] <= 100 and not r["fell"]        # 45° — со второй попытки, ~90 с
 
 
 def test_station_behind_is_reported_lost_and_robot_stays_on_the_table():

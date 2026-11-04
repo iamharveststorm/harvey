@@ -27,7 +27,7 @@ HAND_TURN, HAND_SPEED, HAND_GAIN, HAND_AIM, HAND_STOP_MM, HAND_LOST_S = 30.0, 40
 EDGE_SPEED, EDGE_EXTRA_S, EDGE_TURN, EDGE_RATE = 30.0, 0.5, 120.0, 40.0
 LIFTED_CLEAR_S = 1.0
 SEARCH_RATE, SEARCH_TURN = 30.0, 370.0                    # полный оборот с запасом
-CENTER_RATE = 20.0
+CENTER_RATE = 30.0                                        # проход сектора маяка; опоздание сигнала гасит проход в обе стороны
 APPROACH_SPEED, DROP_MM, BACK_MM = 40.0, 8, 4             # площадка и башенка ближе стола на ≥ 8 мм; «снова стол» — в 4 мм
 HOLD_GAIN, HOLD_MAX = 2.0, 15.0                           # держать курс при ходьбе
 FACE_DONE = 1.0                                           # повернулся к метке — в 1°
@@ -35,7 +35,6 @@ AXIS_V, AXIS_D, AXIS_TIMEOUT_S, AXIS_CREEP = 25.0, 400.0, 25.0, 20.0   # шаг 
 FINE_V, LOST_S, AXIS_DONE_MM = 5.0, 1.0, 1.0              # на заходе: ушёл из клина — шаг вбок 5 мм/с (резкая смена шага вбок дёргает корпус); середина клина — в 1 мм
 OVERSHOOT_S = 0.45                                        # башенку видно, когда корпус на ~17 мм дальше контактов
 TABLE_HOLD_S = 0.6                                        # «снова стол» — не меньше 0,6 с: у края площадки луч дрожит от шага
-RX_MM = 71.0                                              # центральный ИК-приёмник впереди центра корпуса
 LIE_WAIT_S, RETRY_BACK_S = 3.0, 5.0                       # повтор: отойти на 20 см — чтобы снова увидеть площадку
 CHARGE_A = -0.05                                          # ток заряда (как spine.CHARGE_A)
 
@@ -195,14 +194,14 @@ class Behavior:
 
     def _home_axis(self, tel, events, vision, now):
         """Выйти на ось станции: шагом вбок пройти клин, где центральный приёмник видит оба светодиода, туда и обратно
-        (как сектор маяка) и встать на его середину. Станцию держать перед собой: по метке — доворот на неё, без метки —
-        доворот на шаг вбок с расстояния AXIS_D. Потом снова повернуться к станции — с оси это и есть курс по оси."""
+        (как сектор маяка) и встать на его середину. Станцию держать перед собой (по метке — доворот на неё, без метки —
+        доворот на шаг вбок с расстояния AXIS_D, курс держит гироскоп): если смотреть прямо на маяк и приёмник на оси,
+        то и центр корпуса на оси. Потом снова повернуться к станции — точнее, чем доворот на ходу."""
         side, dock, d = tel.get("axis", "none"), vision.get("dock"), self.data
         if now - self.t0 > AXIS_TIMEOUT_S:
             self._go("home_search", now)
             return STILL, "stand"
         d["lat"] += d["vy"] * self.dt
-        d.setdefault("h_ref", self.heading)
         if side == "none":
             d.update(edges=[], inside=None, vy=0.0)
             return (AXIS_CREEP, 0, self._facing(dock, 0.0)), "stand"
@@ -216,6 +215,15 @@ class Behavior:
         d["vy"] = vy
         return (0, vy, self._facing(dock, vy)), "stand"
 
+    def _facing(self, dock, vy) -> float:
+        """Доворот, чтобы станция оставалась впереди при шаге вбок. По метке — на неё; без метки — заданный курс
+        сдвигается на доворот от шага вбок с расстояния AXIS_D, а гироскоп держит его против увода."""
+        if dock:
+            return clip(TURN_GAIN * dock["bearing_deg"] + math.degrees(-vy / dock["dist_mm"]), CENTER_RATE)
+        turn = math.degrees(-vy / AXIS_D)
+        self.data["h_hold"] = self.data.get("h_hold", self.heading) + turn * self.dt
+        return clip(turn + HOLD_GAIN * (self.data["h_hold"] - self.heading), CENTER_RATE)
+
     def _cross_wedge(self, side, d) -> float | None:
         """Скорость вбок, чтобы пройти клин туда и обратно и встать на середину; None — уже на середине.
         Корпус догоняет команду шага с запаздыванием ~0,3 с, и край, замеченный на ходу, сдвинут по ходу. Четыре края —
@@ -224,25 +232,15 @@ class Behavior:
         if inside != d["inside"]:
             d["inside"] = inside
             if d["edges"] or inside:
-                d["edges"].append(self._receiver_lat())
+                d["edges"].append(d["lat"])
                 if len(d["edges"]) == 2:
                     d["dir"] = -d["dir"]
         if len(d["edges"]) >= 4:
-            err = sum(d["edges"][:4]) / 4 - self._receiver_lat()
+            err = sum(d["edges"][:4]) / 4 - d["lat"]
             return None if abs(err) < AXIS_DONE_MM else clip(2.0 * err, AXIS_V)
         if not d["edges"]:                                  # ещё не входили в клин: к оси (изнутри — сначала вправо)
             d["dir"] = AXIS_V if side == "right" else -AXIS_V
         return d["dir"]
-
-    def _receiver_lat(self) -> float:
-        """Где центральный приёмник вбок (мм) от места, где начали искать ось: шаги вбок плюс доворот корпуса."""
-        return self.data["lat"] + RX_MM * math.sin(math.radians(self.heading - self.data["h_ref"]))
-
-    def _facing(self, dock, vy) -> float:
-        """Доворот, чтобы станция оставалась впереди при шаге вбок."""
-        if dock:
-            return clip(TURN_GAIN * dock["bearing_deg"] + math.degrees(-vy / dock["dist_mm"]), CENTER_RATE)
-        return math.degrees(-vy / AXIS_D)
 
     def _home_center(self, tel, events, vision, now):
         """Пройти сектор, где маяк видят оба приёмника, туда и обратно и встать на его середину. Направление на маяк
@@ -353,7 +351,12 @@ class Behavior:
         return STILL, "lie"
 
     def _home_retry(self, tel, events, vision, now):
-        return self._back_for(RETRY_BACK_S, "home_search", "stand", now)
+        """Не замкнулось: отойти и сразу снова выйти на ось — Харви стоит лицом к станции почти на ней, искать не нужно."""
+        if now - self.t0 >= RETRY_BACK_S:
+            self.on_axis = False
+            self._faced(now)
+            return STILL, "stand"
+        return (-APPROACH_SPEED, 0, 0), "stand"
 
     def _docked(self, tel, events, vision, now):
         return STILL, "lie"

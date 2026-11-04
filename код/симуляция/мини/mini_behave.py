@@ -1,8 +1,9 @@
 """Поведение Харви «Компакт мини» в симуляции: голова (harvey_head/behavior.py) управляет роботом только по его датчикам.
 
     (окружение C:/venvs/harvey) python mini_behave.py        # все сценарии, итог в behave_results.json
-Робот — mini_robot.SimRobot: настоящий Spine прошивки RP2350 с имитациями датчиков. Голова видит то же, что увидит на
-роботе: телеметрию и события RP2350 и «зрение» (где рука в кадре — заглушка ПК).
+Робот — mini_robot.SimRobot: настоящий Spine прошивки RP2350 с имитациями датчиков. Голова — настоящая (Head + Body:
+поведение и походка, 50 раз в секунду, как на Pi). Видит она то же, что на роботе: телеметрию и события RP2350 и
+«зрение» (рука в кадре и метка станции — заглушка разбора кадра).
 """
 import json
 import math
@@ -29,6 +30,11 @@ def _head_dir():
 sys.path.insert(0, str(_head_dir()))
 import mini_robot as mr  # noqa: E402
 from harvey_head.behavior import Behavior  # noqa: E402
+from harvey_head.body import Body  # noqa: E402
+from harvey_head.gait import Gait  # noqa: E402
+from harvey_head.head import Head  # noqa: E402
+
+HEAD_EVERY = round(0.02 / mr.TICK)                  # голова — 50 раз в секунду
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCK = (0.15, 0.0)                                   # центр площадки; башенка за ней по +x
@@ -39,21 +45,22 @@ END = {"look": ("idle", "at_hand"), "hand": ("at_hand",), "home": ("docked", "ho
 def run(robot, goal, limit_s, during=None):
     """Голова ведёт робота к цели, пока не дойдёт до конечного состояния или не выйдет время.
     during(robot) — что делает мир на каждом шаге (двигает руку, поднимает робота)."""
-    b = Behavior(robot.t)
-    b.request(goal, robot.t)
+    port = robot.link()
+    body = Body(port, Behavior(robot.t), Gait(), vision=lambda now: robot.vision(), now=robot.t)
+    head = Head(port, body=body, now=robot.t)
+    body.request(goal, robot.t)
+    b = body.behavior
     log = {"states": [], "fell": False, "max_tilt": 0.0, "yaw": 0.0}
     prev = robot.pose()[2]
-    cmd, events, t_end = {"v": (0, 0, 0), "pose": "stand"}, [], robot.t + limit_s
+    t_end = robot.t + limit_s
     while robot.t < t_end:
         if during:
             during(robot)
-        robot.step(cmd)
-        events += robot.events
-        if round(robot.t / mr.TICK) % 10 == 0:                         # голова думает с частотой телеметрии, 20 Гц
-            cmd = b.update(robot.tel, events, robot.vision(), robot.t)
-            events = []
-            if not log["states"] or log["states"][-1] != cmd["state"]:
-                log["states"].append(cmd["state"])
+        robot.physics()
+        if round(robot.t / mr.TICK) % HEAD_EVERY == 0:
+            head.tick(robot.t)
+            if not log["states"] or log["states"][-1] != b.state:
+                log["states"].append(b.state)
         y = robot.pose()[2]
         log["yaw"] += (y - prev + 180) % 360 - 180
         prev = y
@@ -84,7 +91,7 @@ class NoCamera:
         return {}
 
 
-def scenario_home(start, camera=True, limit_s=90.0):
+def scenario_home(start, camera=True, limit_s=120.0):
     r = mr.SimRobot(table=HOME_TABLE, dock_pos=DOCK, start=start)
     log = run(r if camera else NoCamera(r), "home", limit_s)
     log.update(start=list(start), camera=camera, charging=r.charging(), miss_mm=miss_mm(r))

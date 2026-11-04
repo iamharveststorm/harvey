@@ -2,6 +2,65 @@
  "домой_при_свете": [
   {
    "states": [
+    "home_search",
+    "home_face",
+    "home_axis",
+    "home_face",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.4,
+   "yaw": 1,
+   "t": 13.9,
+   "state": "docked",
+   "start": [
+    -0.1,
+    0.0,
+    0
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    -7,
+    1
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_face",
+    "home_axis",
+    "home_face",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.5,
+   "yaw": -40,
+   "t": 18.0,
+   "state": "docked",
+   "start": [
+    -0.1397777478867205,
+    0.07764571353075622,
+    40
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    10,
+    2
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
     "home_face",
     "home_axis",
     "home_face",
@@ -12,74 +71,8 @@
    ],
    "fell": false,
    "max_tilt": 0.6,
-   "yaw": 0,
-   "t": 13.4,
-   "state": "docked",
-   "start": [
-    -0.1,
-    0.0,
-    0
-   ],
-   "camera": true,
-   "charging": true,
-   "miss_mm": [
-    0,
-    1
-   ]
-  },
-  {
-   "states": [
-    "home_search",
-    "home_center",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "docked"
-   ],
-   "fell": false,
-   "max_tilt": 1.0,
-   "yaw": -41,
-   "t": 18.7,
-   "state": "docked",
-   "start": [
-    -0.1397777478867205,
-    0.07764571353075622,
-    40
-   ],
-   "camera": true,
-   "charging": true,
-   "miss_mm": [
-    13,
-    1
-   ]
-  },
-  {
-   "states": [
-    "home_search",
-    "home_center",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "home_retry",
-    "home_search",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "docked"
-   ],
-   "fell": false,
-   "max_tilt": 2.1,
    "yaw": 30,
-   "t": 33.6,
+   "t": 14.3,
    "state": "docked",
    "start": [
     -0.03793852415718171,
@@ -90,15 +83,11 @@
    "charging": true,
    "miss_mm": [
     13,
-    -1
+    1
    ]
   },
   {
    "states": [
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
     "home_search",
     "home_center",
     "home_face",
@@ -110,9 +99,9 @@
     "docked"
    ],
    "fell": false,
-   "max_tilt": 0.8,
+   "max_tilt": 0.5,
    "yaw": 270,
-   "t": 31.4,
+   "t": 29.7,
    "state": "docked",
    "start": [
     -0.15310889132455355,
@@ -122,8 +111,8 @@
    "camera": true,
    "charging": true,
    "miss_mm": [
-    -10,
-    3
+    4,
+    0
    ]
   },
   {
@@ -143,7 +132,7 @@
    "fell": false,
    "max_tilt": 0.9,
    "yaw": 210,
-   "t": 26.7,
+   "t": 25.4,
    "state": "docked",
    "start": [
     -0.04151111077974451,
@@ -153,7 +142,44 @@
    "camera": true,
    "charging": true,
    "miss_mm": [
-    -6,
+    -2,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_search",
+    "home_center",
+    "home_face",
+    "edge",
+    "home_search",
+    "home_center",
+    "home_search",
+    "home_center",
+    "home_face",
+    "home_axis",
+    "home_face",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.8,
+   "yaw": 480,
+   "t": 35.8,
+   "state": "docked",
+   "start": [
+    -0.06213203435596426,
+    0.21213203435596426,
+    -120
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    -7,
     1
    ]
   },
@@ -163,6 +189,92 @@
     "home_center",
     "home_search",
     "home_center",
+    "home_face",
+    "home_axis",
+    "home_face",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.8,
+   "yaw": 179,
+   "t": 16.3,
+   "state": "docked",
+   "start": [
+    -0.02726539554219745,
+    0.03125667198004746,
+    180
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    -9,
+    3
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_face",
+    "home_axis",
+    "home_face",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 0.9,
+   "yaw": -60,
+   "t": 21.1,
+   "state": "docked",
+   "start": [
+    -0.1490815697220945,
+    -0.1394640263744308,
+    60
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    1,
+    -1
+   ]
+  },
+  {
+   "states": [
+    "home_search",
+    "home_center",
+    "home_face",
+    "home_axis",
+    "home_face",
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
+   ],
+   "fell": false,
+   "max_tilt": 1.0,
+   "yaw": 61,
+   "t": 17.4,
+   "state": "docked",
+   "start": [
+    -0.030213449743578202,
+    0.12618681599723014,
+    -60
+   ],
+   "camera": true,
+   "charging": true,
+   "miss_mm": [
+    14,
+    0
+   ]
+  },
+  {
+   "states": [
+    "home_search",
     "home_face",
     "edge",
     "home_search",
@@ -181,136 +293,8 @@
    ],
    "fell": false,
    "max_tilt": 0.5,
-   "yaw": 481,
-   "t": 38.8,
-   "state": "docked",
-   "start": [
-    -0.06213203435596426,
-    0.21213203435596426,
-    -120
-   ],
-   "camera": true,
-   "charging": true,
-   "miss_mm": [
-    0,
-    -2
-   ]
-  },
-  {
-   "states": [
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "docked"
-   ],
-   "fell": false,
-   "max_tilt": 0.8,
-   "yaw": 180,
-   "t": 18.2,
-   "state": "docked",
-   "start": [
-    -0.02726539554219745,
-    0.03125667198004746,
-    180
-   ],
-   "camera": true,
-   "charging": true,
-   "miss_mm": [
-    -10,
-    1
-   ]
-  },
-  {
-   "states": [
-    "home_search",
-    "home_center",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "docked"
-   ],
-   "fell": false,
-   "max_tilt": 0.8,
-   "yaw": -59,
-   "t": 22.1,
-   "state": "docked",
-   "start": [
-    -0.1490815697220945,
-    -0.1394640263744308,
-    60
-   ],
-   "camera": true,
-   "charging": true,
-   "miss_mm": [
-    -9,
-    -2
-   ]
-  },
-  {
-   "states": [
-    "home_search",
-    "home_center",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "docked"
-   ],
-   "fell": false,
-   "max_tilt": 0.6,
-   "yaw": 59,
-   "t": 18.3,
-   "state": "docked",
-   "start": [
-    -0.030213449743578202,
-    0.12618681599723014,
-    -60
-   ],
-   "camera": true,
-   "charging": true,
-   "miss_mm": [
-    6,
-    1
-   ]
-  },
-  {
-   "states": [
-    "home_face",
-    "edge",
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
-    "home_face",
-    "home_axis",
-    "home_face",
-    "home_approach",
-    "home_back",
-    "home_lie",
-    "docked"
-   ],
-   "fell": false,
-   "max_tilt": 0.9,
-   "yaw": -2,
-   "t": 31.6,
+   "yaw": 360,
+   "t": 31.8,
    "state": "docked",
    "start": [
     -0.029980530712231057,
@@ -320,8 +304,8 @@
    "camera": true,
    "charging": true,
    "miss_mm": [
-    0,
-    3
+    14,
+    -1
    ]
   }
  ],
@@ -339,8 +323,8 @@
    ],
    "fell": false,
    "max_tilt": 0.6,
-   "yaw": 0,
-   "t": 46.7,
+   "yaw": -1,
+   "t": 39.2,
    "state": "docked",
    "start": [
     -0.1,
@@ -350,8 +334,8 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    -12,
-    -3
+    11,
+    1
    ]
   },
   {
@@ -366,9 +350,9 @@
     "docked"
    ],
    "fell": false,
-   "max_tilt": 0.7,
+   "max_tilt": 0.9,
    "yaw": -42,
-   "t": 46.1,
+   "t": 39.8,
    "state": "docked",
    "start": [
     -0.1397777478867205,
@@ -378,7 +362,7 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    -11,
+    -5,
     3
    ]
   },
@@ -394,9 +378,9 @@
     "docked"
    ],
    "fell": false,
-   "max_tilt": 0.5,
+   "max_tilt": 0.6,
    "yaw": 30,
-   "t": 41.2,
+   "t": 35.3,
    "state": "docked",
    "start": [
     -0.03793852415718171,
@@ -406,16 +390,12 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    2,
-    -1
+    16,
+    0
    ]
   },
   {
    "states": [
-    "home_search",
-    "home_center",
-    "home_search",
-    "home_center",
     "home_search",
     "home_center",
     "home_axis",
@@ -426,9 +406,9 @@
     "docked"
    ],
    "fell": false,
-   "max_tilt": 1.0,
+   "max_tilt": 0.6,
    "yaw": 270,
-   "t": 59.1,
+   "t": 51.5,
    "state": "docked",
    "start": [
     -0.15310889132455355,
@@ -438,8 +418,8 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    10,
-    -2
+    13,
+    -3
    ]
   },
   {
@@ -458,7 +438,7 @@
    "fell": false,
    "max_tilt": 0.5,
    "yaw": 211,
-   "t": 53.2,
+   "t": 46.5,
    "state": "docked",
    "start": [
     -0.04151111077974451,
@@ -468,8 +448,8 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    -4,
-    -1
+    0,
+    -2
    ]
   },
   {
@@ -489,25 +469,28 @@
     "home_back",
     "home_lie",
     "home_retry",
-    "home_search",
+    "home_axis",
     "home_center",
-    "home_axis"
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
    ],
    "fell": false,
    "max_tilt": 1.6,
-   "yaw": 482,
-   "t": 90.0,
-   "state": "home_axis",
+   "yaw": 479,
+   "t": 90.1,
+   "state": "docked",
    "start": [
     -0.06213203435596426,
     0.21213203435596426,
     -120
    ],
    "camera": false,
-   "charging": false,
+   "charging": true,
    "miss_mm": [
-    -231,
-    -9
+    -3,
+    2
    ]
   },
   {
@@ -521,12 +504,18 @@
     "home_approach",
     "home_back",
     "home_lie",
+    "home_retry",
+    "home_axis",
+    "home_center",
+    "home_approach",
+    "home_back",
+    "home_lie",
     "docked"
    ],
    "fell": false,
-   "max_tilt": 0.8,
-   "yaw": 180,
-   "t": 44.3,
+   "max_tilt": 1.6,
+   "yaw": 181,
+   "t": 69.5,
    "state": "docked",
    "start": [
     -0.02726539554219745,
@@ -536,7 +525,7 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    -4,
+    9,
     0
    ]
   },
@@ -553,8 +542,8 @@
    ],
    "fell": false,
    "max_tilt": 0.6,
-   "yaw": -59,
-   "t": 48.2,
+   "yaw": -60,
+   "t": 42.5,
    "state": "docked",
    "start": [
     -0.1490815697220945,
@@ -564,7 +553,7 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    -12,
+    14,
     -2
    ]
   },
@@ -578,27 +567,28 @@
     "home_back",
     "home_lie",
     "home_retry",
-    "home_search",
-    "home_center",
     "home_axis",
     "home_center",
-    "home_approach"
+    "home_approach",
+    "home_back",
+    "home_lie",
+    "docked"
    ],
    "fell": false,
-   "max_tilt": 1.4,
-   "yaw": 57,
-   "t": 90.0,
-   "state": "home_approach",
+   "max_tilt": 1.7,
+   "yaw": 58,
+   "t": 68.8,
+   "state": "docked",
    "start": [
     -0.030213449743578202,
     0.12618681599723014,
     -60
    ],
    "camera": false,
-   "charging": false,
+   "charging": true,
    "miss_mm": [
-    -79,
-    7
+    -10,
+    2
    ]
   },
   {
@@ -606,6 +596,8 @@
     "home_search",
     "home_center",
     "edge",
+    "home_search",
+    "home_center",
     "home_search",
     "home_center",
     "home_search",
@@ -620,9 +612,9 @@
     "docked"
    ],
    "fell": false,
-   "max_tilt": 1.3,
-   "yaw": 361,
-   "t": 59.4,
+   "max_tilt": 0.9,
+   "yaw": 362,
+   "t": 53.9,
    "state": "docked",
    "start": [
     -0.029980530712231057,
@@ -632,8 +624,8 @@
    "camera": false,
    "charging": true,
    "miss_mm": [
-    15,
-    -3
+    5,
+    -2
    ]
   }
  ],
@@ -643,8 +635,8 @@
    "home_lost"
   ],
   "fell": false,
-  "max_tilt": 0.9,
-  "yaw": 361,
+  "max_tilt": 0.4,
+  "yaw": 373,
   "t": 13.1,
   "state": "home_lost",
   "on_table": true
@@ -655,11 +647,11 @@
    "idle"
   ],
   "fell": false,
-  "max_tilt": 0.8,
-  "yaw": 365,
-  "t": 18.5,
+  "max_tilt": 0.6,
+  "yaw": 366,
+  "t": 18.4,
   "state": "idle",
-  "drift_mm": 2
+  "drift_mm": 0
  },
  "рука_впереди": {
   "states": [
@@ -669,9 +661,9 @@
   "fell": false,
   "max_tilt": 0.3,
   "yaw": 24,
-  "t": 6.2,
+  "t": 6.1,
   "state": "at_hand",
-  "hand_mm": 89,
+  "hand_mm": 90,
   "on_table": true
  },
  "рука_сзади": {
@@ -681,11 +673,11 @@
    "at_hand"
   ],
   "fell": false,
-  "max_tilt": 0.5,
+  "max_tilt": 0.6,
   "yaw": 168,
-  "t": 11.5,
+  "t": 11.1,
   "state": "at_hand",
-  "hand_mm": 89,
+  "hand_mm": 90,
   "on_table": true
  },
  "рука_за_краем": [
@@ -699,8 +691,8 @@
     "look"
    ],
    "fell": false,
-   "max_tilt": 0.6,
-   "yaw": 500,
+   "max_tilt": 0.9,
+   "yaw": 596,
    "t": 25.0,
    "state": "look",
    "side": "front",
@@ -717,8 +709,8 @@
     "look"
    ],
    "fell": false,
-   "max_tilt": 0.6,
-   "yaw": 500,
+   "max_tilt": 0.9,
+   "yaw": 596,
    "t": 25.0,
    "state": "look",
    "side": "left",
@@ -735,8 +727,8 @@
     "look"
    ],
    "fell": false,
-   "max_tilt": 0.6,
-   "yaw": 500,
+   "max_tilt": 0.9,
+   "yaw": 596,
    "t": 25.0,
    "state": "look",
    "side": "back",
@@ -753,8 +745,8 @@
     "look"
    ],
    "fell": false,
-   "max_tilt": 0.6,
-   "yaw": 500,
+   "max_tilt": 0.9,
+   "yaw": 596,
    "t": 25.0,
    "state": "look",
    "side": "right",
@@ -765,12 +757,13 @@
  "подняли": {
   "states": [
    "look",
+   "edge",
    "lifted",
    "look"
   ],
   "fell": false,
-  "max_tilt": 2.7,
-  "yaw": 157,
+  "max_tilt": 2.5,
+  "yaw": 162,
   "t": 12.0,
   "state": "look",
   "relaxed_after_s": 0.25,

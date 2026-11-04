@@ -175,20 +175,7 @@ class SimBeacon:
 
 
 # ---------- шины приводов ----------
-LEG_LIMB = {"LF": 1, "LM": 2, "LB": 3, "RF": 4, "RM": 5, "RB": 6}       # схемы/README.md «Номера приводов»
-SERVO_IDS = {f"{n}_{j}": 10 * k + i for n, k in LEG_LIMB.items() for i, j in enumerate("cfk", 1)}
-SERVO_IDS.update({f"{s}_{j}": 10 * k + i for s, k in (("L", 7), ("R", 8)) for i, j in enumerate("ypeg", 1)})
-SERVO_IDS.update({"L_s": 91, "R_s": 92})
-JOINT_OF = {v: k for k, v in SERVO_IDS.items()}
-STEPS = 4096                                        # позиций на оборот; 2048 — ноль сустава (предварительно: нули задаются при сборке)
-
-
-def to_pos(rad):
-    return round(2048 + rad * STEPS / (2 * math.pi))
-
-
-def to_rad(pos):
-    return (pos - 2048) * 2 * math.pi / STEPS
+from harvey_head.servos import JOINT_OF, SERVO_IDS, to_pos, to_rad  # noqa: E402,F401 — номера и позиции — как у головы
 
 
 class SimBus:

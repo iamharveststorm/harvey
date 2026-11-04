@@ -26,3 +26,5 @@ BRAIN_HOST, BRAIN_PORT = "harvey-brain.local", 8765
 TELEMETRY_TO_BRAIN_HZ = 5
 
 FPS = 30
+LOOP_HZ = 50                                 # главный цикл: тело шлёт цели суставов на RP2350 50 раз в секунду
+CAMERA_EVERY_S = 0.2                         # метка станции — 5 кадров в секунду (скорость разбора на Pi Zero проверить)

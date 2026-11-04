@@ -15,8 +15,9 @@ FORWARD_TO_SPINE = {"j", "relax", "hold", "cal"}         # команды ПК, 
 
 class Head:
     def __init__(self, spine, eyes: dict | None = None, brain=None, audio=None, now: float = 0.0, seed: int | None = None,
-                 telemetry_hz: float = 5.0):
-        self.spine, self.eyes, self.brain, self.audio = spine, eyes or {}, brain, audio
+                 telemetry_hz: float = 5.0, body=None, fps: float = 30.0):
+        self.spine, self.eyes, self.brain, self.audio, self.body = spine, eyes or {}, brain, audio, body
+        self.eye_period, self.t_eyes = 1.0 / fps, None
         self.mood = Mood(now)
         self.anim = Animator(seed)
         self.touch = TouchDetector()
@@ -28,6 +29,8 @@ class Head:
 
     # ---------- входы ----------
     def on_spine(self, msg: dict, now: float) -> None:
+        if self.body is not None:
+            self.body.on_spine(msg, now)
         t = msg.get("t")
         if t == "ev":
             self._spine_event(msg, now)
@@ -65,6 +68,8 @@ class Head:
             self.mood.emote(msg.get("name", "neutral"), float(msg.get("s", 2.0)), now)
         elif t == "look":
             self.anim.look_at(float(msg.get("x", 0)), float(msg.get("y", 0)))
+        elif t == "goal" and self.body is not None:
+            self.body.request(msg.get("goal", "idle"), now)
         elif t == "play" and self.audio is not None:
             self.audio.play(msg["path"])
         elif t in FORWARD_TO_SPINE:
@@ -82,9 +87,13 @@ class Head:
             self.on_spine(msg, now)
         for name in self.touch.tick(now):
             self._touch_event(name, now)
+        if self.body is not None:
+            self.body.tick(now)
         self.expression = self.mood.expression(now)
         self.anim.set(self.expression, now)
         look = self.anim.frame(now)
-        for side, display in self.eyes.items():
-            display.show(to_rgb565(render(look, side)))
+        if self.t_eyes is None or now - self.t_eyes >= self.eye_period - 1e-9:
+            self.t_eyes = now
+            for side, display in self.eyes.items():
+                display.show(to_rgb565(render(look, side)))
         return {"expression": self.expression, "look": look}

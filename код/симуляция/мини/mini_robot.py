@@ -1,26 +1,24 @@
 """Харви «Компакт мини» в симуляции целиком — так, как его увидит голова (Pi Zero 2 W).
 
-Голова шлёт команду корпусу {"v": (вперёд мм/с, влево мм/с, поворот °/с), "pose": "stand" | "lie"}. Походка (`Walker`)
-считает цели суставов и отправляет их сообщением `j` протокола link.py в настоящий `Spine` прошивки RP2350. Spine читает
-имитации датчиков (mini_sensors), решает рефлексами, пускать ли движение, пишет цели на шины — и шлёт телеметрию.
-Походка здесь заменяет будущий модуль походки головы.
+Голова шлёт цели суставов сообщением `j` протокола link.py в настоящий `Spine` прошивки RP2350. Spine читает имитации
+датчиков (mini_sensors), решает рефлексами, пускать ли движение, пишет цели на шины — и шлёт телеметрию.
+Два способа вести робота:
+- `step(cmd)` — команда корпусу {"v": (мм/с, мм/с, °/с), "pose": …} → походка головы (harvey_head/gait.py) → `j`;
+- `link()` — порт для настоящей головы (harvey_head/head.py: Head + Body), как USB на роботе; тогда `physics()`.
 """
 import math
-from types import SimpleNamespace
-
-import numpy as np
 
 import harvey_mini as hm
 import mini_sensors as ms
 import edge  # noqa: E402 — из прошивки (ms.FIRMWARE)
 import link
 import pins
+from harvey_head import servos
 from spine import Spine
 
 TABLE = (-0.30, 0.30, -0.30, 0.30)                 # столешница 60 × 60 см
 TICK = 0.005                                       # проход главного цикла Spine ~5 мс (код/прошивка/rp2350/README.md)
 SUB = round(TICK / hm.DT)
-LIE_DZ = hm.CAD["rest_drop"] * hm.mm               # лечь: корпус ниже на 13 мм — пластины брюха на контакты
 # латунные пластины на брюхе 40 × 12 мм (модели/мини/harvey_mini_parts.py: x −20…20, y = BELLY_Y ± 6), контакт Ø5:
 # середина контакта должна быть не ближе 2,5 мм к краю пластины
 PLATE_X, PLATE_Y = 20 - 2.5, 6 - 2.5
@@ -42,6 +40,21 @@ class Port:
         self.from_spine += data
 
 
+class HeadLink:
+    """Как SpineLink головы (harvey_head/links.py): poll — сообщения RP2350, send — сообщение в RP2350."""
+
+    def __init__(self, robot):
+        self.robot = robot
+
+    def poll(self, now):
+        out, self.robot.inbox = self.robot.inbox, []
+        return out
+
+    def send(self, msg):
+        self.robot._send(msg)
+        return True
+
+
 class Pin:
     def __init__(self):
         self.level = 0
@@ -58,11 +71,10 @@ class SimRobot:
         self.has_hand, self.dock_pos = hand is not None, dock_pos
         ms.place(self.sim, *start)
         self.sim.run(0.4, record=False)
-        self.t, self.dz = 0.0, 0.0
-        self.targets = SimpleNamespace(q=dict(self.sim.q))     # цели суставов головы; Spine решает, дойдут ли они до шин
-        self.walker = hm.Walker(self.targets)
+        self.t = 0.0
+        self.gait = hm.HG.Gait(hm.GEO)
         self.port, self.reader = Port(), link.LineReader()
-        self.tel, self.events, self.lift_events = {}, [], []
+        self.tel, self.events, self.lift_events, self.inbox = {}, [], [], []
         bus = ms.SimBus(self.sim)
         tof = edge.EdgeArray(None, [Pin() for _ in pins.EDGE_NAMES], pins.EDGE_NAMES, pins.EDGE_ADDR0,
                              make=ms.tof_factory(self.sim), nominal=pins.EDGE_NOMINAL_MM)
@@ -80,6 +92,7 @@ class SimRobot:
         self.spine.step()
         self.events = []
         for msg in self.reader.feed(bytes(self.port.from_spine)):
+            self.inbox.append(msg)
             if msg["t"] == "tel":
                 self.tel = msg
             elif msg["t"] == "ev":
@@ -87,20 +100,20 @@ class SimRobot:
         self.port.from_spine.clear()
 
     def step(self, cmd):
-        """Один проход 5 мс: походка → `j` → Spine → физика."""
-        vx, vy, wz = cmd.get("v", (0, 0, 0))
-        dz_t = LIE_DZ if cmd.get("pose") == "lie" else 0.0
-        v = np.array([vx / 1000, vy / 1000, math.radians(wz)])
-        for _ in range(SUB):
-            self.dz += float(np.clip(dz_t - self.dz, -0.02 * hm.DT, 0.02 * hm.DT))
-            self.walker.step(v, self.dz)
-        vel = self.walker.vel
-        q = {ms.SERVO_IDS[k]: ms.to_pos(a) for k, a in self.targets.q.items()}
-        self._send(link.joints(q, (vel[0] * 1000, vel[1] * 1000, math.degrees(vel[2]))))
+        """Один проход 5 мс: походка головы → `j` → Spine → физика."""
+        self._send(servos.message(self.gait.step(cmd, TICK), self.gait.velocity()))
+        self.physics()
+
+    def physics(self):
+        """5 мс физики и проход Spine."""
         for _ in range(SUB):
             self.sim.step(False)
         self.t += TICK
         self._tick()
+        self.inbox = self.inbox[-200:]
+
+    def link(self):
+        return HeadLink(self)
 
     # ---------- что видит голова кроме RP2350 ----------
     def vision(self):

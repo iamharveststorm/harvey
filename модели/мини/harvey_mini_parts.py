@@ -827,6 +827,15 @@ def export_stl(out=None):
     return out
 
 
+def export_head(path):
+    """Размеры ног и поза «поджато» для походки головы (код/голова/harvey_head/gait.py) — мм и градусы."""
+    data = {"cox": G["cox"], "fem": G["fem"], "tib": G["tib"], "foot_r": G["foot_r"], "mounts": G["mounts"],
+            "stance_deg": 20.0, "tuck_deg": list(CLAW_TUCK[:3]), "rest_drop": REST_DROP,
+            "note": "выгружено из модели/мини/harvey_mini_parts.py (export_head) — не править руками"}
+    json.dump(data, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    return path
+
+
 def export_sim(out):
     """Видимые детали для симуляции: STL на тело (м), в системе тела — как в код/симуляция/мини/harvey_mini.py."""
     os.makedirs(out, exist_ok=True); man = {}
@@ -869,4 +878,5 @@ if __name__ == "__main__":
     if not fast:
         print("STL:", export_stl())
         print("для симуляции:", export_sim(os.path.join(HERE, "..", "..", "код", "симуляция", "мини", "assets")))
+    print("для головы:", export_head(os.path.join(HERE, "..", "..", "код", "голова", "harvey_head", "mini_geometry.json")))
     print(RULES)
