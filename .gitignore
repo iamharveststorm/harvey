@@ -20,3 +20,7 @@ graphify-out/*.sig
 .metrics/
 **/target/coverage/
 **/target/mutation-workers/
+
+# pytest и модели речи «большого мозга» (скачиваются: код/мозг/get_models.py)
+.pytest_cache/
+код/мозг/models/
