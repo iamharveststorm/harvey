@@ -43,3 +43,9 @@ def test_cue_inside_word_is_not_action(text):
 @pytest.mark.parametrize("text", ["стопка книг", "стойкий"])
 def test_command_inside_word_is_not_command(text):
     assert quick_reply(text) is None
+
+
+def test_quick_command_survives_misheard_wake_word():
+    from harvey_brain.wake import split_wake
+    woke, rest = split_wake("карви идти домой")
+    assert woke and quick_reply(rest).goal == "home"

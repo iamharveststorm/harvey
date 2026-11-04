@@ -94,3 +94,75 @@ def test_warm_failed_message():
     out, feed = [], iter(["", ""])
     main(["--text", "--no-head"], input_fn=lambda: next(feed), llm=llm, out=out.append)
     assert out == ["Харви просыпается…", "LLM недоступна — отвечаю только на команды."]
+
+
+def run_voice(argv, listener, speaker, server=None):
+    out = []
+    code = main(argv, server=server, llm=FakeLLM(), out=out.append, listener=listener, speaker=speaker)
+    return code, [line for line in out if not line.startswith(("Харви просыпается", "Харви готов", "LLM недоступна"))]
+
+
+def test_mic_mode_listens_prints_and_speaks():
+    from harvey_brain.speech import ListListener
+    said = []
+
+    class Spk:
+        def say(self, text):
+            said.append(text)
+
+        def close(self):
+            said.append("closed")
+
+    server = FakeServer()
+    code, out = run_voice(["--mic"], ListListener(["шум", "Харви, посмотри на меня"]), Spk(), server)
+    assert code == 0
+    assert "Слышу: Харви, посмотри на меня" in out and "Харви: Смотрю! [curious, look]" in out
+    assert said == ["Смотрю!", "closed"] and {"t": "goal", "goal": "look"} in server.sent
+
+
+def test_voice_flag_speaks_in_text_mode():
+    said, feed = [], iter(["Харви, кто ты?", "", ""])
+
+    class Spk:
+        def say(self, text):
+            said.append(text)
+
+        def close(self):
+            pass
+
+    out = []
+    main(["--text", "--voice", "--no-head"], input_fn=lambda: next(feed), llm=FakeLLM(), out=out.append, speaker=Spk())
+    assert said == ["Я краб."]
+
+
+def test_non_ascii_models_path_exits_with_message():
+    out = []
+    code = main(["--mic", "--no-head", "--models", "C:/Харви/models"], llm=FakeLLM(), out=out.append)
+    assert code == 2 and any("espeak" in line for line in out)
+
+
+def test_models_option_parsed():
+    a = build_parser().parse_args(["--mic", "--voice", "--models", "C:/m"])
+    assert a.mic and a.voice and a.models == "C:/m"
+
+
+def test_build_voice_mic_wraps_speaker_half_duplex(monkeypatch):
+    from harvey_brain import __main__ as m
+    monkeypatch.setattr(m, "MicListener", lambda models: ("mic", models))
+    monkeypatch.setattr(m, "PiperSpeaker", lambda models: ("piper", models))
+    monkeypatch.setattr(m, "HalfDuplexSpeaker", lambda spk, lis: ("half", spk, lis))
+    args = build_parser().parse_args(["--mic", "--models", "C:/m"])
+    listener, speaker = m.build_voice(args, None, None)
+    assert listener[0] == "mic" and speaker == ("half", ("piper", m.Path("C:/m")), listener)
+
+
+def test_build_voice_voice_only_has_plain_speaker(monkeypatch):
+    from harvey_brain import __main__ as m
+    monkeypatch.setattr(m, "PiperSpeaker", lambda models: "piper")
+    args = build_parser().parse_args(["--text", "--voice", "--models", "C:/m"])
+    assert m.build_voice(args, None, None) == (None, "piper")
+
+
+def test_build_voice_text_only_loads_nothing():
+    from harvey_brain import __main__ as m
+    assert m.build_voice(build_parser().parse_args(["--text"]), None, None) == (None, None)
