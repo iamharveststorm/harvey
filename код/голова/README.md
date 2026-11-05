@@ -32,6 +32,7 @@ aliases: [Голова мини, Pi Zero мини]
 | `body.py` | тело: телеметрия, события и «зрение» → поведение → походка → `j` 50 раз в секунду; через 1,5 с после старта — `cal` (калибровка края) |
 | `protocol.py` | формат сообщений — общий с прошивкой (`код/прошивка/rp2350/link.py`) |
 | `main.py` | запуск на Pi; `--sim` — без железа |
+| `setup/` | установка на Pi: `deploy.py` (ПК: копия по ssh), `provision.py` (Pi: пакеты, `config.txt`, служба), `check.py` (Pi: проверка железа и связи) |
 | `preview.py` | лист выражений и анимация (`глаза_выражения.png`, `глаза_анимация.gif`) |
 
 Команды от ПК:
@@ -47,7 +48,7 @@ aliases: [Голова мини, Pi Zero мини]
 C:\venvs\harvey-head\Scripts\python.exe -m pytest -q tests
 ```
 
-185 тестов, < 1 с.
+234 теста, < 7 с.
 - **Глаза** сверяются с эталонными картинками `tests/golden/` до пикселя. После намеренной правки рисунка эталоны пересоздаёт команда `python -m tests.test_exact`.
 - **Драйвер дисплея** проверяется на имитации SPI: команды при DC = 0, данные при DC = 1, полный код запуска из файла производителя.
 - **Связь с ПК** проверяется на настоящем TCP-сервере: обмен в обе стороны и переподключение.
@@ -74,16 +75,32 @@ C:\venvs\harvey-head\Scripts\python.exe -m pytest -q tests
 
 Качество кода: покрытие 89 %, без тестов только открытие настоящих дисплеев и `main`; самая сложная функция — 9, повторяющегося кода нет.
 
-## Установка на Pi Zero 2 W (Raspberry Pi OS Bookworm Lite)
+## Установка на Pi Zero 2 W (Raspberry Pi OS Lite 64-bit, Bookworm или новее)
 
-1. `sudo raspi-config` → Interface → включить SPI.
-2. Звуковая карта I2S — в `/boot/firmware/config.txt`. Для пары INMP441 + MAX98357A обычно ставят `dtoverlay=googlevoicehat-soundcard`. **Проверить на стенде:** `arecord -l`, `aplay -l` и пробная запись.
-3. Окружение:
+Пароли и Wi-Fi скрипты не трогают: их вводите вы в Raspberry Pi Imager. Всё из `setup/` — на стандартной библиотеке Python.
+
+1. **Карта.** В Raspberry Pi Imager: Raspberry Pi OS Lite (64-bit); в настройках — имя `harvey`, пользователь и пароль, ваш Wi-Fi, включить SSH и вставить свой открытый ключ (вход по ключу).
+2. **Копирование и настройка одной командой с ПК** (из `код/голова`; нужен OpenSSH — в Windows он есть):
    ```bash
-   sudo apt install python3-venv python3-numpy python3-pil python3-spidev python3-gpiozero python3-lgpio alsa-utils python3-opencv python3-picamera2
-   python3 -m venv --system-site-packages ~/harvey && ~/harvey/bin/pip install pyserial
+   python setup/deploy.py harvey.local --install            # --brain <имя ПК> — если не имя этого ПК
    ```
-4. Репозиторий целиком (голове нужны `код/прошивка/rp2350/link.py` и файл запуска дисплея из `документы/`): `git clone` и запуск `~/harvey/bin/python -m harvey_head.main` из `код/голова`.
+   `deploy.py` пакует `harvey_head/`, `setup/`, `код/прошивка/rp2350/link.py`, файл запуска дисплея из `документы/` и (если есть) `servo_calib.json` и передаёт по ssh в `~/harvey` на Pi с той же раскладкой папок, что в репозитории. `--install` затем запускает на Pi `provision.py --apply --brain <ПК>` под sudo:
+   - пакеты apt (SPI, GPIO, ALSA, OpenCV, Picamera2), окружение `~/harvey/venv` с `--system-site-packages` и `pyserial`;
+   - блок `# --- harvey ---` в конец секции `[all]` файла `/boot/firmware/config.txt` (SPI, I2C, I2S, оверлей звука, камера); перед первой правкой — копия `config.txt.harvey.bak`;
+   - пользователь входит в группы доступа к железу (только существующие в системе);
+   - `/etc/harvey/head.env` (адрес ПК; уже существующий файл не затирается) и служба `harvey-head` с автозапуском.
+   Повторный запуск ничего не дублирует. Посмотреть шаги, ничего не меняя: `sudo python3 ~/harvey/код/голова/setup/provision.py --dry-run`. Обновить код головы после правок: `python setup/deploy.py harvey.local` и `sudo systemctl restart harvey-head` на Pi.
+3. **Перезагрузить Pi:** `sudo reboot` (оверлеи из `config.txt` включаются при загрузке).
+4. **Проверить железо и связь** на Pi: `python3 ~/harvey/код/голова/setup/check.py` — таблица ✓ / ✗ / ?: SPI, карты звука (вывод и ввод), камера, RP2350 (`/dev/ttyACM*`), доступность ПК на порту 8765, служба. Код выхода 0, если всё в порядке.
+5. **ПК.** «Большой мозг» (`python -m harvey_brain`, порт 8765) должен быть запущен. Брандмауэр Windows порт 8765 для входящих сам не открывается — разрешите его сами, иначе `check.py` напишет «ПК … не отвечает … (брандмауэр Windows?)».
+
+Настройки, зависящие от места, читаются из переменных окружения (службе их даёт `/etc/harvey/head.env`) поверх `config.py`: `HARVEY_BRAIN_HOST`, `HARVEY_BRAIN_PORT`, `HARVEY_SPINE_PORT`, `HARVEY_ALSA_DEVICE`.
+
+**Проверить на стенде (предварительно, в документах проекта этого нет):**
+- Оверлей `googlevoicehat-soundcard` для пары INMP441 + MAX98357A. Если `aplay -l` / `arecord -l` карты не показывают — подобрать другой оверлей и поправить `HARVEY_LINES` в `setup/provision.py`.
+- Имя карты ALSA (ожидается `sndrpigooglevoi`): подставить в `HARVEY_ALSA_DEVICE` в `/etc/harvey/head.env`, например `plughw:1,0`, затем `sudo systemctl restart harvey-head`.
+- Что RP2350-Zero по USB появляется как `/dev/ttyACM0` (иначе `HARVEY_SPINE_PORT`); VID/PID платы не фиксируются.
+- Группы доступа `gpio spi i2c audio video dialout`: `provision.py` добавляет пользователя только в те, что есть в системе (`getent group`), остальные пропускает с сообщением «нет группы … — пропущено». Нужна ли отсутствующая группа (например `gpio` на новой ОС) — проверить на стенде: если глаза/кнопки/звук не работают с «Permission denied», смотреть `id` и права `/dev/spidev*`, `/dev/gpiochip*`.
 
 ## Калибровка нулей приводов
 

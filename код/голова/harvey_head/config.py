@@ -3,6 +3,8 @@
 ПРЕДВАРИТЕЛЬНО: выводы — из схемы (схемы/README.md, «Выводы Pi Zero 2 W»), проверить на стенде до пайки.
 Номера GPIO — нумерация BCM (как в gpiozero), в скобках — пин гребёнки.
 """
+import os
+from typing import Mapping
 
 # Глаза: 2 × GC9D01 160 × 160 на SPI0 (документы/GC9D01N — даташит Galaxycore.pdf)
 SPI_BUS = 0
@@ -17,7 +19,7 @@ TOUCH_PADS = (5, 6, 16, 17)
 
 # Звук I2S: 2 × INMP441 + MAX98357A; SD усилителя — GPIO26 (37): 0 — тишина
 AMP_SD = 26
-ALSA_DEVICE = "default"
+ALSA_DEVICE = "default"                      # имя карты ALSA — предварительно, проверить на стенде (aplay -l)
 
 # Связь
 SPINE_PORT = "/dev/ttyACM0"                  # RP2350-Zero по USB
@@ -28,3 +30,15 @@ TELEMETRY_TO_BRAIN_HZ = 5
 FPS = 30
 LOOP_HZ = 50                                 # главный цикл: тело шлёт цели суставов на RP2350 50 раз в секунду
 CAMERA_EVERY_S = 0.2                         # метка станции — 5 кадров в секунду (скорость разбора на Pi Zero проверить)
+
+
+def from_env(env: Mapping[str, str]) -> dict:
+    """Настройки, зависящие от места: адрес ПК, порт RP2350, устройство ALSA. Пустое значение — как будто не задано."""
+    def get(name, default, cast=str):
+        value = env.get("HARVEY_" + name)
+        return cast(value) if value else default
+    return {"BRAIN_HOST": get("BRAIN_HOST", BRAIN_HOST), "BRAIN_PORT": get("BRAIN_PORT", BRAIN_PORT, int),
+            "SPINE_PORT": get("SPINE_PORT", SPINE_PORT), "ALSA_DEVICE": get("ALSA_DEVICE", ALSA_DEVICE)}
+
+
+globals().update(from_env(os.environ))
