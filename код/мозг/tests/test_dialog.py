@@ -1,4 +1,8 @@
+from datetime import datetime
+
+from harvey_brain.assistant import Assistant
 from harvey_brain.dialog import Dialog
+from harvey_brain.memory import Memory
 from harvey_brain.reply import Reply
 
 
@@ -89,3 +93,42 @@ def test_event_gap_boundary():
     d.on_head({"t": "ev", "ev": "docked"}, 0)
     assert d.on_head({"t": "ev", "ev": "docked"}, 19.9) is None
     assert d.on_head({"t": "ev", "ev": "docked"}, 20) is not None
+
+
+def helper(tmp_path, hour=14, minute=5):
+    mem = Memory(tmp_path / "memory.json")
+    wall = datetime(2026, 11, 5, hour, minute).timestamp()
+    return Assistant(mem), (lambda: wall)
+
+
+def test_assistant_answers_without_llm(tmp_path):
+    llm = FakeLLM()
+    assistant, wall = helper(tmp_path)
+    r = Dialog(llm, assistant, wall_fn=wall).on_text("Харви, который час?", 0)
+    assert r.say == "Сейчас 14:05." and llm.asked == []
+
+
+def test_small_talk_still_goes_to_llm_with_assistant(tmp_path):
+    llm = FakeLLM()
+    assistant, wall = helper(tmp_path)
+    assert Dialog(llm, assistant, wall_fn=wall).on_text("Харви, как дела", 0).say == "Хорошо."
+    assert llm.asked == ["как дела"]
+
+
+def test_quick_command_wins_over_assistant(tmp_path):
+    assistant, wall = helper(tmp_path)
+    assert Dialog(FakeLLM(), assistant, wall_fn=wall).on_text("Харви, иди домой", 0).goal == "home"
+
+
+def test_timer_question_answered_without_wake_word(tmp_path):
+    assistant, wall = helper(tmp_path)
+    d = Dialog(FakeLLM(), assistant, wall_fn=wall)
+    assert d.on_text("Харви, поставь таймер", 0).say == "На сколько поставить таймер?"
+    assert d.on_text("на десять минут", 3).say == "Ставлю таймер на 10 минут."
+
+
+def test_stay_awake_after_alarm():
+    d = Dialog(FakeLLM(), follow_s=8)
+    assert not d.awake(100)
+    d.stay_awake(100)
+    assert d.awake(107.9) and not d.awake(108)

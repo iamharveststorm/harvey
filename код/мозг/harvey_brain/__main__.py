@@ -1,4 +1,4 @@
-"""python -m harvey_brain (--text | --mic) [--voice] [--models PATH] [--model M] [--port 8765] [--no-head]"""
+"""python -m harvey_brain (--text | --mic) [--voice] [--models PATH] [--home PATH] [--model M] [--port 8765] [--no-head]"""
 import argparse
 import asyncio
 import os
@@ -6,8 +6,10 @@ import threading
 import time
 from pathlib import Path
 
+from .assistant import Assistant
 from .dialog import Dialog
 from .llm import OllamaChat
+from .memory import Memory, resolve_home
 from .reply import Reply, to_head
 from .server import HeadServer
 from .speech import HalfDuplexSpeaker, MicListener, ModelsPathError, PiperSpeaker, resolve_models_dir
@@ -21,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mic", action="store_true", help="голос: микрофон -> распознавание, ответ вслух")
     p.add_argument("--voice", action="store_true", help="в --text ещё и говорить вслух (Piper)")
     p.add_argument("--models", help="папка моделей речи (иначе HARVEY_MODELS, иначе ~/.harvey/models; только ASCII-путь)")
+    p.add_argument("--home", help="папка памяти Харви (иначе HARVEY_HOME, иначе ~/.harvey): memory.json")
     p.add_argument("--model", default=DEFAULT_MODEL, help="модель Ollama")
     p.add_argument("--port", type=int, default=8765, help="порт для головы")
     p.add_argument("--no-head", action="store_true", help="без сервера для головы")
@@ -48,6 +51,15 @@ async def watch_head(server, dialog: Dialog, out, speaker=None) -> None:
             await deliver(reply, server, out, speaker)
 
 
+async def watch_due(assistant: Assistant, dialog: Dialog, server, out, speaker, clock, poll_s: float) -> None:
+    """Сработавшие таймеры и напоминания — обычный ответ; после него Харви ещё слушает без «Харви»."""
+    while True:
+        for reply in assistant.due(clock()):
+            dialog.stay_awake(time.monotonic())
+            await deliver(reply, server, out, speaker)
+        await asyncio.sleep(poll_s)
+
+
 async def read_lines(dialog: Dialog, input_fn, server, out, speaker=None) -> None:
     """Строки с клавиатуры; пустая строка дважды подряд или Ctrl+C — конец."""
     loop, blanks = asyncio.get_running_loop(), 0
@@ -72,11 +84,19 @@ async def read_speech(dialog: Dialog, listener, server, out, speaker=None) -> No
             await deliver(reply, server, out, speaker)
 
 
-async def run(args, input_fn, server, llm, out, listener=None, speaker=None) -> None:
-    dialog = Dialog(llm)
+def start_background(dialog, assistant, server, out, speaker, clock, poll_s) -> list:
+    """Фоновые задачи: события головы (если есть голова) и срабатывание таймеров."""
+    jobs = [watch_head(server, dialog, out, speaker)] if server else []
+    jobs += [watch_due(assistant, dialog, server, out, speaker, clock, poll_s)] if assistant else []
+    return [asyncio.ensure_future(job) for job in jobs]
+
+
+async def run(args, input_fn, server, llm, out, listener=None, speaker=None, assistant=None,
+              clock=time.time, poll_s=0.5) -> None:
+    dialog = Dialog(llm, assistant, wall_fn=clock)
     if server:
         await server.start()
-    watcher = asyncio.ensure_future(watch_head(server, dialog, out, speaker)) if server else None
+    background = start_background(dialog, assistant, server, out, speaker, clock, poll_s)
     try:
         if listener:
             await read_speech(dialog, listener, server, out, speaker)
@@ -85,8 +105,8 @@ async def run(args, input_fn, server, llm, out, listener=None, speaker=None) -> 
     finally:
         for part in (listener, speaker):
             part and part.close()
-        if watcher:
-            watcher.cancel()
+        for task in background:
+            task.cancel()
         if server:
             await server.stop()
 
@@ -118,7 +138,8 @@ def build_voice(args, listener, speaker):
     return listener, HalfDuplexSpeaker(speaker, listener) if listener else speaker
 
 
-def main(argv=None, input_fn=input, server=None, llm=None, out=print, listener=None, speaker=None) -> int:
+def main(argv=None, input_fn=input, server=None, llm=None, out=print, listener=None, speaker=None,
+         clock=time.time, poll_s=0.5) -> int:
     args = build_parser().parse_args(argv)
     try:
         listener, speaker = build_voice(args, listener, speaker)
@@ -129,10 +150,12 @@ def main(argv=None, input_fn=input, server=None, llm=None, out=print, listener=N
         server = server or HeadServer(port=args.port)
     else:
         server = None
-    llm = llm or OllamaChat(args.model)
+    memory = Memory(resolve_home(args.home, os.environ, Path.home()) / "memory.json")
+    memory.load()
+    llm = llm or OllamaChat(args.model, about=memory.about)
     warming = warm_up(llm, out)
     try:
-        asyncio.run(run(args, input_fn, server, llm, out, listener, speaker))
+        asyncio.run(run(args, input_fn, server, llm, out, listener, speaker, Assistant(memory), clock, poll_s))
     except KeyboardInterrupt:
         pass
     warming.join(0.5)

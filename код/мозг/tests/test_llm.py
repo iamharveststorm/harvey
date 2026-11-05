@@ -65,3 +65,24 @@ def test_warm_ok_keeps_history():
 @pytest.mark.parametrize("bad", [urllib.error.URLError("x"), TimeoutError(), {}])
 def test_warm_fails(bad):
     assert OllamaChat("m", post=Fake(bad)).warm() is False
+
+
+def system_messages(payload):
+    return [m["content"] for m in payload["messages"] if m["role"] == "system"]
+
+
+def test_about_is_second_system_message():
+    fake = Fake()
+    OllamaChat("m", post=fake, about=lambda: "Человека зовут Аня.").ask("привет")
+    assert system_messages(fake.calls[0][1]) == [SYSTEM_PROMPT, "Человека зовут Аня."]
+    assert fake.calls[0][1]["messages"][2]["role"] == "user"
+
+
+def test_empty_about_adds_nothing_and_is_read_every_time():
+    fake, who = Fake(), [""]
+    chat = OllamaChat("m", post=fake, about=lambda: who[0])
+    chat.ask("раз")
+    who[0] = "Человека зовут Боря."
+    chat.ask("два")
+    assert system_messages(fake.calls[0][1]) == [SYSTEM_PROMPT]
+    assert system_messages(fake.calls[1][1]) == [SYSTEM_PROMPT, "Человека зовут Боря."]

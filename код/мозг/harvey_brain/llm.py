@@ -16,13 +16,16 @@ class OllamaChat:
     FALLBACK = Reply("Ой, я задумался и потерял мысль.", "sad")
 
     def __init__(self, model: str, url: str = "http://127.0.0.1:11434", history_turns: int = 6,
-                 timeout: float = 30.0, post=None):
+                 timeout: float = 30.0, post=None, about=lambda: ""):
         self.model, self.url, self.history_turns, self.timeout = model, url, history_turns, timeout
-        self.post = post or post_json
+        self.post, self.about = post or post_json, about
         self.history: list[tuple[str, str]] = []
 
     def _payload(self, text: str) -> dict:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        known = self.about()
+        if known:
+            messages.append({"role": "system", "content": known})
         for user, said in self.history:
             messages += [{"role": "user", "content": user}, {"role": "assistant", "content": said}]
         messages.append({"role": "user", "content": text})

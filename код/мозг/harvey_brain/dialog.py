@@ -1,4 +1,6 @@
 """Диалог: сон/бодрствование, слово пробуждения, быстрые команды или LLM, события головы."""
+import time
+
 from .commands import quick_reply, wants_action
 from .reply import Reply
 from .wake import normalize, split_wake
@@ -12,13 +14,17 @@ EVENT_GAP_S = 20.0
 
 
 class Dialog:
-    def __init__(self, llm, follow_s: float = 8.0):
-        self.llm, self.follow_s = llm, follow_s
+    def __init__(self, llm, assistant=None, follow_s: float = 8.0, wall_fn=time.time):
+        self.llm, self.assistant, self.follow_s, self.wall_fn = llm, assistant, follow_s, wall_fn
         self._awake_until = float("-inf")
         self._last_event: dict[str, float] = {}
 
     def awake(self, now: float) -> bool:
         return now < self._awake_until
+
+    def stay_awake(self, now: float) -> None:
+        """Бодрствовать ещё follow_s (после сработавшего таймера человек отвечает без «Харви»)."""
+        self._awake_until = now + self.follow_s
 
     def on_text(self, text: str, now: float) -> Reply | None:
         woke, rest = split_wake(text)
@@ -34,6 +40,9 @@ class Dialog:
         quick = quick_reply(rest)
         if quick:
             return quick
+        local = self.assistant and self.assistant.handle(rest, self.wall_fn())
+        if local:
+            return local
         reply = self.llm.ask(rest)
         if not wants_action(rest):
             reply.goal = None
