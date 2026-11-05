@@ -70,6 +70,8 @@ class Head:
             self.anim.look_at(float(msg.get("x", 0)), float(msg.get("y", 0)))
         elif t == "goal" and self.body is not None:
             self.body.request(msg.get("goal", "idle"), now)
+        elif t == "turn" and self.body is not None:
+            self.body.request("turn", now, deg=float(msg.get("deg", 0)))
         elif t == "play" and self.audio is not None:
             self.audio.play(msg["path"])
         elif t in FORWARD_TO_SPINE:

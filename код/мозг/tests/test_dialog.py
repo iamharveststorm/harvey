@@ -132,3 +132,29 @@ def test_stay_awake_after_alarm():
     assert not d.awake(100)
     d.stay_awake(100)
     assert d.awake(107.9) and not d.awake(108)
+
+
+class FakeWatcher:
+    def __init__(self, bearing):
+        self.bearing = bearing
+
+
+def test_look_at_me_with_a_visible_face_turns_the_body_to_it():
+    llm = FakeLLM()
+    r = Dialog(llm, watcher=FakeWatcher(-23.5)).on_text("Харви, посмотри на меня", 0)
+    assert r == Reply("Смотрю на тебя!", "curious", None, -23.5) and llm.asked == []
+
+
+def test_look_at_me_with_a_face_straight_ahead_still_turns():
+    assert Dialog(FakeLLM(), watcher=FakeWatcher(0.0)).on_text("Харви, посмотри на меня", 0).turn == 0.0
+
+
+def test_look_at_me_without_a_face_looks_around_as_before():
+    assert Dialog(FakeLLM(), watcher=FakeWatcher(None)).on_text("Харви, посмотри на меня", 0) == Reply(
+        "Смотрю!", "curious", "look")
+    assert Dialog(FakeLLM()).on_text("Харви, посмотри на меня", 0) == Reply("Смотрю!", "curious", "look")
+
+
+def test_other_quick_commands_ignore_the_face():
+    r = Dialog(FakeLLM(), watcher=FakeWatcher(30.0)).on_text("Харви, иди домой", 0)
+    assert r.goal == "home" and r.turn is None

@@ -13,6 +13,7 @@ from harvey_brain.reply import Reply
 def home(tmp_path, monkeypatch):
     """Память Харви в тестах — только во временной папке, не в настоящем ~/.harvey."""
     monkeypatch.setenv("HARVEY_HOME", str(tmp_path / "harvey-home"))
+    monkeypatch.setenv("HARVEY_MODELS", str(tmp_path / "models"))      # пусто: настоящая модель зрения в тестах не грузится
     return tmp_path / "harvey-home"
 
 
@@ -286,7 +287,13 @@ def test_llm_gets_memory_about(monkeypatch):
 
 class FakeMediaServer:
     def __init__(self, connected=False):
-        self.connected, self.started, self.stopped = connected, False, False
+        self.connected, self.started, self.stopped, self.video = connected, False, False, []
+
+    def request_video(self, on, fps=5):
+        self.video.append((on, fps))
+
+    def latest_frame(self):
+        return None
 
     async def start(self):
         self.started = True
@@ -349,3 +356,170 @@ def test_head_audio_keeps_injected_parts():
     from harvey_brain import __main__ as m
     args = build_parser().parse_args(["--head-audio"])
     assert m.build_voice(args, "L", "S", media="M") == ("L", "S")
+
+
+# --- зрение --------------------------------------------------------------------------------------------------------
+from harvey_brain.vision import Face, HeadFrames, Sight  # noqa: E402
+
+LEFT_FACE = Face(100, 260, 200, 200, 0.95)           # левая часть кадра 1280 × 720: азимут > 0
+RIGHT_FACE = Face(980, 260, 200, 200, 0.95)
+
+
+class FakeSight:
+    """Сценарий взглядов: список наборов лиц по одному на вызов, последний повторяется."""
+
+    def __init__(self, *looks):
+        from harvey_head.dock_tag import camera_matrix
+        self.looks, self.k, self.closed = list(looks), camera_matrix(1280, 720), False
+
+    def look(self):
+        faces = self.looks.pop(0) if len(self.looks) > 1 else self.looks[0]
+        return faces, self.k, (1280, 720)
+
+    def close(self):
+        self.closed = True
+
+
+class SlowListener:
+    """Голос, который приходит не сразу: зрению есть время поработать."""
+
+    def __init__(self, *texts):
+        self.texts = texts
+
+    def utterances(self):
+        time.sleep(0.3)
+        yield from self.texts
+
+    def close(self):
+        pass
+
+
+def run_vision(argv, sight, items=(), server=None, media=None, speaker=None, out=None, listener=None):
+    feed = iter([*items, "", ""])
+
+    def input_fn():
+        item = next(feed)
+        if callable(item):
+            item()
+            return ""
+        return item
+
+    out = [] if out is None else out
+    code = main(argv, input_fn=input_fn, server=server, llm=FakeLLM(), out=out.append, media=media, speaker=speaker,
+                sight=sight, vision_s=0.005, listener=listener)
+    return code, out
+
+
+def settle():
+    time.sleep(0.3)
+
+
+def test_vision_option_parsed():
+    assert build_parser().parse_args(["--text"]).vision is None
+    assert build_parser().parse_args(["--vision", "webcam"]).vision == "webcam"
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["--vision", "radar"])
+
+
+def test_head_audio_turns_vision_on_by_default_and_asks_the_head_for_video():
+    media, server = FakeMediaServer(connected=True), FakeServer()
+    run_vision(["--head-audio", "--no-head"], FakeSight([]), media=media, speaker=Spk(), listener=SlowListener())
+    assert media.video == [(True, 5)]
+
+
+def test_vision_head_alone_also_starts_the_media_server():
+    media = FakeMediaServer(connected=True)
+    run_vision(["--text", "--vision", "head"], FakeSight([]), media=media, items=[settle])
+    assert media.started and media.video == [(True, 5)]
+
+
+def test_vision_off_and_no_media_means_no_looking():
+    media, server = FakeMediaServer(connected=True), FakeServer()
+    run_vision(["--head-audio", "--vision", "off"], FakeSight([LEFT_FACE]), media=media, speaker=Spk(),
+               listener=SlowListener(), server=server)
+    assert media.video == [] and server.sent == []
+    server2 = FakeServer()
+    run_vision(["--text"], FakeSight([LEFT_FACE]), items=[settle], server=server2)
+    assert server2.sent == []
+
+
+def test_eyes_follow_the_face_and_greeting_is_spoken_once():
+    server, spk = FakeServer(), Spk()
+    run_vision(["--text", "--vision", "webcam"], FakeSight([LEFT_FACE]), items=[settle, settle], server=server, speaker=spk)
+    assert spk.said == ["Привет!"]
+    looks = [m for m in server.sent if m["t"] == "look"]
+    assert looks and looks[0]["x"] < 0
+    assert {"t": "emote", "name": "happy", "s": 3.0} in server.sent
+
+
+def test_greeting_uses_the_name_from_memory(home):
+    home.mkdir(parents=True)
+    (home / "memory.json").write_text(json.dumps({"name": "Аня", "facts": [], "timers": []}, ensure_ascii=False), "utf-8")
+    spk = Spk()
+    run_vision(["--text", "--vision", "webcam", "--no-head"], FakeSight([RIGHT_FACE]), items=[settle], speaker=spk)
+    assert spk.said == ["Привет, Аня!"]
+
+
+def test_no_greeting_without_a_face():
+    spk = Spk()
+    run_vision(["--text", "--vision", "webcam", "--no-head"], FakeSight([]), items=[settle], speaker=spk)
+    assert spk.said == []
+
+
+def test_look_at_me_with_a_visible_face_sends_turn_with_the_bearing():
+    server = FakeServer()
+    run_vision(["--text", "--vision", "webcam"], FakeSight([LEFT_FACE]), server=server,
+               items=[settle, "Харви, посмотри на меня"])
+    turns = [m for m in server.sent if m["t"] == "turn"]
+    assert len(turns) == 1 and turns[0]["deg"] > 10
+    assert {"t": "goal", "goal": "look"} not in server.sent
+
+
+def test_look_at_me_with_the_face_on_the_right_turns_right():
+    server = FakeServer()
+    run_vision(["--text", "--vision", "webcam"], FakeSight([RIGHT_FACE]), server=server,
+               items=[settle, "Харви, посмотри на меня"])
+    assert [m["deg"] for m in server.sent if m["t"] == "turn"][0] < -10
+
+
+def test_look_at_me_without_a_face_looks_around_as_before():
+    server, out = FakeServer(), []
+    run_vision(["--text", "--vision", "webcam"], FakeSight([]), server=server, items=[settle, "Харви, посмотри на меня"],
+               out=out)
+    assert {"t": "goal", "goal": "look"} in server.sent and not [m for m in server.sent if m["t"] == "turn"]
+    assert "Харви: Смотрю! [curious, look]" in out
+
+
+def test_stale_head_frame_is_not_a_face_right_now():
+    class Media(FakeMediaServer):
+        def latest_frame(self):
+            return (time.time() - 5.0, JPEG)             # голова отключилась 5 с назад
+
+    import cv2
+    import numpy as np
+    JPEG = cv2.imencode(".jpg", np.zeros((72, 128), np.uint8))[1].tobytes()
+    media, server, spk = Media(connected=True), FakeServer(), Spk()
+    finder = type("F", (), {"find": lambda self, img: [LEFT_FACE]})()
+    sight = Sight(HeadFrames(media), finder)
+    run_vision(["--head-audio"], sight, media=media, speaker=spk, server=server,
+               listener=SlowListener("Харви, посмотри на меня"))
+    assert spk.said == ["Смотрю!"] and not [m for m in server.sent if m["t"] in ("look", "turn")]
+
+
+def test_without_the_model_default_vision_is_switched_off_with_a_message():
+    media, out = FakeMediaServer(connected=True), []
+    code = main(["--head-audio", "--no-head"], llm=FakeLLM(), out=out.append, media=media, listener=__import__(
+        "harvey_brain.speech", fromlist=["ListListener"]).ListListener([]), speaker=Spk())
+    assert code == 0 and media.video == [] and any("Зрение выключено" in line for line in out)
+
+
+def test_explicit_vision_without_the_model_stops_with_exit_code_2():
+    out = []
+    assert main(["--text", "--vision", "webcam", "--no-head"], llm=FakeLLM(), out=out.append) == 2
+    assert any("face_detection_yunet_2023mar.onnx" in line for line in out)
+
+
+def test_sight_is_closed_at_the_end():
+    sight = FakeSight([])
+    run_vision(["--text", "--vision", "webcam", "--no-head"], sight)
+    assert sight.closed

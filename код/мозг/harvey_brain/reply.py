@@ -14,6 +14,7 @@ class Reply:
     say: str
     emote: str = "neutral"
     goal: str | None = None
+    turn: float | None = None       # повернуться корпусом на столько градусов (+ — налево); не от LLM
 
 
 def trim_say(text: str, sentences: int = 2, limit: int = 300) -> str:
@@ -50,6 +51,8 @@ def parse_reply(raw: str) -> Reply:
 
 def to_head(r: Reply, seconds: float = 3.0) -> list[dict]:
     msgs = [{"t": "emote", "name": r.emote, "s": seconds}]
-    if r.goal:
+    if r.turn is not None:
+        msgs.append({"t": "turn", "deg": r.turn})
+    elif r.goal:
         msgs.append({"t": "goal", "goal": r.goal})
     return msgs

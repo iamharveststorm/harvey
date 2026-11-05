@@ -14,8 +14,9 @@ EVENT_GAP_S = 20.0
 
 
 class Dialog:
-    def __init__(self, llm, assistant=None, follow_s: float = 8.0, wall_fn=time.time):
+    def __init__(self, llm, assistant=None, follow_s: float = 8.0, wall_fn=time.time, watcher=None):
         self.llm, self.assistant, self.follow_s, self.wall_fn = llm, assistant, follow_s, wall_fn
+        self.watcher = watcher                           # видит ли Харви лицо (vision.Watcher) — для «посмотри на меня»
         self._awake_until = float("-inf")
         self._last_event: dict[str, float] = {}
 
@@ -39,7 +40,7 @@ class Dialog:
     def _answer(self, rest: str) -> Reply:
         quick = quick_reply(rest)
         if quick:
-            return quick
+            return self._face_the_person(quick)
         local = self.assistant and self.assistant.handle(rest, self.wall_fn())
         if local:
             return local
@@ -47,6 +48,13 @@ class Dialog:
         if not wants_action(rest):
             reply.goal = None
         return reply
+
+    def _face_the_person(self, reply: Reply) -> Reply:
+        """«Посмотри на меня», когда лицо видно, — повернуться к нему корпусом, а не осматриваться."""
+        bearing = self.watcher.bearing if self.watcher else None
+        if reply.goal != "look" or bearing is None:
+            return reply
+        return Reply("Смотрю на тебя!", reply.emote, None, bearing)
 
     def on_head(self, msg: dict, now: float) -> Reply | None:
         name = msg.get("ev") if msg.get("t") == "ev" else None

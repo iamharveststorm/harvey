@@ -31,8 +31,8 @@ class Body:
         elif msg.get("t") == "ev":
             self.events.append(msg.get("ev"))
 
-    def request(self, goal: str, now: float) -> None:
-        self.behavior.request(goal, now)
+    def request(self, goal: str, now: float, **data) -> None:
+        self.behavior.request(goal, now, **data)
 
     def tick(self, now: float) -> dict | None:
         """Раз в period: команда поведения → углы → `j`. До первой телеметрии RP2350 молчим: он ещё не готов."""

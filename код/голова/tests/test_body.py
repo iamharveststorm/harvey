@@ -144,3 +144,28 @@ def test_dock_camera_keeps_the_last_grabbed_frame_for_the_media_link():
     assert cam.frame is None
     cam.vision(0.0)
     assert cam.frame is frame
+
+
+def test_body_passes_goal_data_to_the_behaviour():
+    spine, body = make()
+    body.request("turn", 0.0, deg=30.0)
+    assert body.behavior.state == "turn" and body.behavior.data["deg"] == 30.0
+    run(body, 2.0, tel_msg=tel(gyr_z=20.0))
+    assert body.behavior.state == "idle"                 # гироскоп показал поворот: 20 °/с за ~1,5 с > 30°
+
+
+def test_head_turns_toward_the_person_on_the_brains_turn_message():
+    calls = []
+
+    class Body:
+        def request(self, goal, now, **data):
+            calls.append((goal, now, data))
+
+    head = Head(Spine(), body=Body(), now=0.0)
+    head.on_brain({"t": "turn", "deg": 30}, 2.5)
+    head.on_brain({"t": "goal", "goal": "home"}, 3.0)
+    assert calls == [("turn", 2.5, {"deg": 30.0}), ("home", 3.0, {})]
+
+
+def test_head_without_a_body_ignores_turn():
+    Head(Spine(), now=0.0).on_brain({"t": "turn", "deg": 30}, 0.0)

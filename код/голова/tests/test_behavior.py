@@ -433,3 +433,66 @@ def test_crossing_the_wedge_holds_the_heading_against_drift():
     r.go(3.0, telem=lambda r: tel(beacon="ahead", axis="left"))
     turn = math.degrees(25.0 / 400.0) * 3.0                          # доворот на шаг вбок за 3 с
     assert r.heading == pytest.approx(turn, abs=1.5)
+
+
+# ---------- повернуться на угол (к человеку) ----------
+def turned(deg, **kw):
+    r = Run()
+    r.b.request("turn", 0.0, deg=deg)
+    assert r.b.state == "turn"
+    r.until("idle", limit=15.0, **kw)
+    return r
+
+
+@pytest.mark.parametrize("deg", [30.0, -45.0, 170.0, -170.0])
+def test_turn_reaches_the_angle_by_the_gyro_and_goes_idle(deg):
+    r = turned(deg)
+    assert r.b.state == "idle" and r.heading == pytest.approx(deg, abs=1.0)
+    assert r.go(0.5)["v"] == (0, 0, 0)
+
+
+def test_turn_170_and_minus_170_take_the_short_way_not_340_degrees():
+    for deg in (170.0, -170.0):
+        r = turned(deg)
+        assert max(abs(h) for h in r.history) < 180 + 5 and math.copysign(1, r.heading) == math.copysign(1, deg)
+
+
+@pytest.mark.parametrize("deg, short", [(350.0, -10.0), (-190.0, 170.0), (190.0, -170.0), (180.0, 180.0), (-180.0, 180.0)])
+def test_turn_angle_is_normalised_to_the_short_way(deg, short):
+    r = turned(deg)
+    assert r.heading == pytest.approx(short, abs=1.0)
+
+
+def test_turn_follows_a_lagging_body_by_the_gyro():
+    r = Run()
+    r.gain = 0.6
+    r.b.request("turn", 0.0, deg=40.0)
+    r.until("idle", limit=20.0)
+    assert r.heading == pytest.approx(40.0, abs=1.0)
+
+
+def test_turn_left_is_positive_rate():
+    r = Run()
+    r.b.request("turn", 0.0, deg=30.0)
+    assert r.go(0.2)["v"][2] > 0
+    r2 = Run()
+    r2.b.request("turn", 0.0, deg=-30.0)
+    assert r2.go(0.2)["v"][2] < 0
+
+
+def test_edge_during_a_turn_does_not_resume_the_turn_and_ends_idle():
+    r = Run()
+    r.b.request("turn", 0.0, deg=90.0)
+    r.go(0.5)
+    front = (1, 1, 0, 0, 0, 0)
+    r.go(0.2, telem=lambda r: tel(far=front), events=lambda r: ["edge"])
+    assert r.b.state == "edge"
+    r.until("idle", limit=15.0)
+    assert r.b.state == "idle" and r.b.goal == "idle"
+
+
+@pytest.mark.parametrize("goal, state", [("look", "look"), ("hand", "hand"), ("home", "home_search"), ("idle", "idle")])
+def test_old_goals_still_start_as_before(goal, state):
+    b = Behavior(0.0)
+    b.request(goal, 0.0)
+    assert b.goal == goal and b.state == state

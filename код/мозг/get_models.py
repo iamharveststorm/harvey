@@ -1,4 +1,4 @@
-"""Скачивает модели речи в папку моделей (по умолчанию ~/.harvey/models): python get_models.py [--models PATH]"""
+"""Скачивает модели речи и зрения в папку моделей (по умолчанию ~/.harvey/models): python get_models.py [--models PATH]"""
 import argparse
 import os
 import shutil
@@ -18,6 +18,7 @@ BASE = "https://github.com/k2-fsa/sherpa-onnx/releases/download"
 class Asset:
     name: str  # имя файла или папки в папке моделей
     url: str
+    min_bytes: int = 0  # меньше — не модель (например, указатель Git LFS вместо файла)
 
     def dest(self, models_dir) -> Path:
         return Path(models_dir) / self.name
@@ -27,11 +28,15 @@ class Asset:
         return self.url.endswith(".tar.bz2")
 
 
+YUNET_URL = ("https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/"
+             "face_detection_yunet_2023mar.onnx")      # opencv_zoo, Apache-2.0, ~232 КБ
+
 ASSETS = (
     Asset("silero_vad.onnx", f"{BASE}/asr-models/silero_vad.onnx"),
     Asset("sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19",
           f"{BASE}/asr-models/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2"),
     Asset("vits-piper-ru_RU-dmitri-medium", f"{BASE}/tts-models/vits-piper-ru_RU-dmitri-medium.tar.bz2"),
+    Asset("vision/face_detection_yunet_2023mar.onnx", YUNET_URL, min_bytes=100_000),
 )
 
 
@@ -47,10 +52,14 @@ def fetch(asset: Asset, models_dir) -> None:
             shutil.copyfileobj(resp, f)
         if expected and part.stat().st_size != expected:
             raise OSError(f"{asset.name}: скачано {part.stat().st_size} байт из {expected}")
+        if part.stat().st_size < asset.min_bytes:
+            raise OSError(f"{asset.name}: скачано {part.stat().st_size} байт — это не модель, а указатель Git LFS "
+                          f"или страница ошибки; нужна ссылка media.githubusercontent.com ({asset.url})")
         if asset.is_archive:
             with tarfile.open(part) as tar:
                 tar.extractall(models_dir, filter="data")
         else:
+            asset.dest(models_dir).parent.mkdir(parents=True, exist_ok=True)
             shutil.move(part, asset.dest(models_dir))
 
 

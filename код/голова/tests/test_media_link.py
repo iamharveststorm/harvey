@@ -117,7 +117,7 @@ def test_mic_audio_arrives_in_640_byte_frames():
     chunks = [struct.pack("<ii", (i + 1) << 16, 0) * 320 for i in range(3)]      # три блока по 20 мс стерео-32
 
     async def scenario(pc, link):
-        mic = MicStream(link, popen=fake_popen([], b"".join(chunks)))
+        mic = MicStream(link, popen=fake_popen([], b"".join(chunks)), log=[].append)
         mic.start()
         assert await until(lambda: len(pc.of(media.AUDIO_UP)) == 3)
         assert [len(p) for p in pc.of(media.AUDIO_UP)] == [640] * 3
@@ -130,7 +130,7 @@ def test_mic_audio_arrives_in_640_byte_frames():
 def test_muted_mic_sends_nothing_but_keeps_reading():
     async def scenario(pc, link):
         popen = fake_popen([], struct.pack("<ii", 65536, 0) * 640)
-        mic = MicStream(link, popen=popen)
+        mic = MicStream(link, popen=popen, log=[].append)
         mic.muted = True
         mic.start()
         assert await until(lambda: popen.procs and popen.procs[0].stdout.tell() == 5120)
@@ -357,6 +357,7 @@ def test_build_media_wires_mic_speaker_and_pump_and_closes():
 
     m = build_media(Cfg, Cam(), Amp(), popen=popen, encode=lambda f: b"jpg")
     assert m.link.port == 1 and m.link.host == "127.0.0.1"
+    m.mic._log = [].append                                  # перезапуск arecord у подставного popen не печатаем
     m.start()
     assert popen.procs[0].cmd[:2] == ["arecord", "-q"] and "hw:9" in popen.procs[0].cmd
     m.link.video_wanted, m.link.video_fps = True, 5.0

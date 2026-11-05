@@ -3,7 +3,8 @@
 Команда — {"v": (вперёд мм/с, влево мм/с, поворот °/с, + — налево), "pose": "stand" | "lie", "state": …}; её превращает
 в шаги модуль походки. Рефлексы края и «подняли» остаются в RP2350: поведение лишь решает, что делать дальше.
 
-Цели (request): «look» — осмотреться, «hand» — подойти к руке, «home» — на станцию.
+Цели (request): «look» — осмотреться, «hand» — подойти к руке, «home» — на станцию, «turn» (deg=…) — повернуться
+на угол на месте (к человеку; + — налево).
 «Зрение» (камера, разбор — на голове, harvey_head/dock_tag.py, или на ПК) — словарь находок: "hand" и "dock" —
 {"bearing_deg", "dist_mm"} руки или метки AprilTag станции в кадре.
 Домой — без ПК и в темноте: найти станцию (метка или ИК-маяк), повернуться к ней (по метке — сразу, по маяку — проход
@@ -49,15 +50,15 @@ class Behavior:
         self.on_axis = False                                # на оси станции — осталось повернуться к ней и идти
 
     # ---------- управление ----------
-    def request(self, goal: str, now: float) -> None:
-        self.goal = goal
+    def request(self, goal: str, now: float, **data) -> None:
+        self.goal = "idle" if goal == "turn" else goal       # поворот — разовое действие: после края возвращаемся в покой
         self.retries = 0
         self.on_axis = False
-        self._begin(goal, now)
+        self._begin(goal, now, **data)
 
-    def _begin(self, goal: str, now: float) -> None:
-        start = {"look": "look", "hand": "hand", "home": "home_search", "idle": "idle"}
-        self._go(start[goal], now)
+    def _begin(self, goal: str, now: float, **data) -> None:
+        start = {"look": "look", "hand": "hand", "home": "home_search", "idle": "idle", "turn": "turn"}
+        self._go(start[goal], now, **data)
 
     def _go(self, state: str, now: float, **data) -> None:
         self.state, self.t0, self.data = state, now, dict(data, h0=self.heading)
@@ -107,6 +108,15 @@ class Behavior:
         turn = self.turn_to(d["h0"] + LOOK_STEP * (k + 1), LOOK_RATE)
         if turn is None:
             d.update(k=k + 1, pause=now)
+            return STILL, "stand"
+        return turn, "stand"
+
+    def _turn(self, tel, events, vision, now):
+        """Повернуться на data["deg"] (+ — налево) по гироскопу, потом покой. Угол — короткой дорогой, в (−180, 180]."""
+        turn = self.turn_to(self.data["h0"] + short_way(self.data["deg"]), LOOK_RATE)
+        if turn is None:
+            self.goal = "idle"
+            self._go("idle", now)
             return STILL, "stand"
         return turn, "stand"
 
@@ -369,6 +379,12 @@ def clip(v: float, limit: float) -> float:
     return max(-limit, min(limit, v))
 
 
+def short_way(deg: float) -> float:
+    """Угол в (−180, 180]: 350° — это −10°."""
+    deg %= 360.0
+    return deg - 360.0 if deg > 180.0 else deg
+
+
 def away_from(far) -> tuple:
     """Шаг прочь от датчиков, под которыми пусто."""
     vx = (EDGE_SPEED if any(far[i] for i in BACK) else 0) - (EDGE_SPEED if any(far[i] for i in FRONT) else 0)
@@ -376,7 +392,7 @@ def away_from(far) -> tuple:
     return (vx, vy, 0)
 
 
-STATES = {"idle": Behavior._idle, "look": Behavior._look, "hand": Behavior._hand, "at_hand": Behavior._at_hand,
+STATES = {"idle": Behavior._idle, "look": Behavior._look, "turn": Behavior._turn, "hand": Behavior._hand, "at_hand": Behavior._at_hand,
           "edge": Behavior._edge, "lifted": Behavior._lifted, "home_search": Behavior._home_search,
           "home_face": Behavior._home_face, "home_axis": Behavior._home_axis, "home_center": Behavior._home_center, "home_approach": Behavior._home_approach, "home_back": Behavior._home_back,
           "home_lie": Behavior._home_lie, "home_retry": Behavior._home_retry, "docked": Behavior._docked,

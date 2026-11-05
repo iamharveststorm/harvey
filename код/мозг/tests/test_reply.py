@@ -55,3 +55,9 @@ def test_prompt_says_goal_none_by_default():
 
 def test_trim_exact_limit_untouched():
     assert trim_say("а" * 300) == "а" * 300
+
+
+def test_to_head_turn_replaces_the_goal():
+    assert to_head(Reply("x", "curious", None, 12.5)) == [{"t": "emote", "name": "curious", "s": 3.0},
+                                                          {"t": "turn", "deg": 12.5}]
+    assert to_head(Reply("x", "curious", None, 0.0))[-1] == {"t": "turn", "deg": 0.0}
