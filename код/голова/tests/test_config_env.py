@@ -1,7 +1,7 @@
 """Настройки головы из переменных окружения: адрес ПК, порт RP2350, устройство ALSA."""
 from harvey_head import config
 
-DEFAULTS = {"BRAIN_HOST": "harvey-brain.local", "BRAIN_PORT": 8765, "SPINE_PORT": "/dev/ttyACM0", "ALSA_DEVICE": "default"}
+DEFAULTS = {"BRAIN_HOST": "harvey-brain.local", "BRAIN_PORT": 8765, "SPINE_PORT": "/dev/ttyACM0", "ALSA_DEVICE": "default", "MEDIA_PORT": 8766}
 
 
 def test_empty_env_gives_defaults():
@@ -25,3 +25,7 @@ def test_empty_values_ignored():
 
 def test_module_constants_follow_from_env():
     assert config.BRAIN_PORT == int(config.BRAIN_PORT) and isinstance(config.BRAIN_HOST, str)
+
+
+def test_env_overrides_media_port():
+    assert config.from_env({"HARVEY_MEDIA_PORT": "9001"})["MEDIA_PORT"] == 9001

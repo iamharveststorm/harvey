@@ -283,3 +283,138 @@ def test_mic_listener_skips_empty_text():
     import threading
     threading.Timer(0.5, mic.close).start()
     assert list(it) == []
+
+
+# --- звук головы: RemoteMicListener / RemoteSpeaker ------------------------------------------------------------
+
+class FakeMedia:
+    """MediaServer без сети: очередь звука и флаг «голова говорит»."""
+
+    def __init__(self):
+        import queue
+        self.audio, self.head_speaking, self.connected, self.sent = queue.Queue(), False, True, []
+
+    def send_speech(self, pcm, rate):
+        self.sent.append((pcm, rate))
+        return True
+
+
+def pcm_frame(value=1000, samples=320):
+    return np.full(samples, value, np.int16).tobytes()
+
+
+def test_remote_mic_listener_yields_text_for_vad_segment_from_head_audio():
+    from harvey_brain.speech import RemoteMicListener
+    media = FakeMedia()
+    for _ in range(10):
+        media.audio.put(pcm_frame())
+    vad = FakeVAD()
+    mic = RemoteMicListener(media, "ignored", vad=vad, asr=FakeASR())
+    it = mic.utterances()
+    assert next(it) == "текст"
+    assert vad.fed[:3] == [512, 512, 512]
+    mic.close()
+    assert list(it) == []
+
+
+def test_remote_mic_blocks_are_float32_scaled():
+    from harvey_brain.speech import RemoteMicListener
+    media = FakeMedia()
+    media.audio.put(np.array([16384, -32768, 0], np.int16).tobytes())
+    mic = RemoteMicListener(media, "ignored", vad=FakeVAD(), asr=FakeASR())
+    block = next(mic._blocks())
+    assert block.dtype == np.float32 and list(block) == [0.5, -1.0, 0.0]
+
+
+def test_remote_mic_drops_audio_while_head_speaks_and_marks_the_end():
+    import threading
+    from harvey_brain.speech import RemoteMicListener
+    media = FakeMedia()
+    media.head_speaking = True
+    media.audio.put(pcm_frame())
+    media.audio.put(pcm_frame())
+    mic = RemoteMicListener(media, "ignored", vad=FakeVAD(), asr=FakeASR())
+    threading.Timer(0.5, lambda: setattr(media, "head_speaking", False)).start()
+    gen = mic._blocks()
+    assert next(gen) is None                       # метка «сбросить VAD»: речь головы кончилась, чужого звука не было
+    assert media.audio.empty()
+    media.audio.put(pcm_frame())
+    assert next(gen) is not None
+
+
+def test_remote_mic_skips_empty_text_and_stops_on_close():
+    import threading
+    from harvey_brain.speech import RemoteMicListener
+
+    class Silent:
+        def transcribe(self, samples, rate):
+            return ""
+
+    media = FakeMedia()
+    for _ in range(10):
+        media.audio.put(pcm_frame())
+    mic = RemoteMicListener(media, "ignored", vad=FakeVAD(), asr=Silent())
+    threading.Timer(0.5, mic.close).start()
+    assert list(mic.utterances()) == []
+
+
+def test_remote_speaker_sends_int16_pcm_with_its_rate():
+    from harvey_brain.speech import RemoteSpeaker
+
+    class Piper:
+        def synth(self, text):
+            return np.array([0.0, 0.5, -0.5, 2.0, -2.0], np.float32), 22050
+
+    media = FakeMedia()
+    RemoteSpeaker(media, Piper()).say("привет")
+    pcm, rate = media.sent[0]
+    assert rate == 22050 and np.frombuffer(pcm, "<i2").tolist() == [0, 16383, -16383, 32767, -32767]
+
+
+def test_remote_speaker_close_is_harmless():
+    from harvey_brain.speech import RemoteSpeaker
+    RemoteSpeaker(FakeMedia(), object()).close()
+
+
+@needs_models
+def test_remote_mic_listener_hears_home_command_through_the_real_media_link(phrase):
+    import asyncio
+    from harvey_brain.media_server import MediaServer
+    from harvey_brain.speech import RemoteMicListener
+    from harvey_head.media_link import MediaLink
+
+    samples, rate = phrase
+    s16 = (np.clip(resample(samples, rate, 16000), -1, 1) * 32767).astype("<i2")
+    silence = np.zeros(16000, "<i2")
+    stream = np.concatenate([silence, s16, silence]).tobytes()
+    frames = [stream[i:i + 640] for i in range(0, len(stream) - 639, 640)]
+
+    async def scenario():
+        server = MediaServer("127.0.0.1", 0)
+        await server.start()
+        link, stop = MediaLink("127.0.0.1", server.port, pause_s=0.01), asyncio.Event()
+        task = asyncio.ensure_future(link.run(stop))
+        try:
+            for _ in range(300):
+                if server.connected and link.connected:
+                    break
+                await asyncio.sleep(0.01)
+            listener = RemoteMicListener(server, MODELS)
+            loop = asyncio.get_running_loop()
+            heard = loop.run_in_executor(None, lambda: next(iter(listener.utterances()), None))
+            for i in range(0, len(frames), 20):            # порциями по 20 кадров (0,4 с звука): очередь головы - 50 кадров
+                for frame in frames[i:i + 20]:
+                    link.offer_audio(frame)
+                await asyncio.sleep(0.02)
+            text = await asyncio.wait_for(heard, 30)
+            listener.close()
+            return text
+        finally:
+            stop.set()
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            await server.stop()
+
+    text = asyncio.run(scenario())
+    woke, rest = split_wake(text)
+    assert woke and quick_reply(rest).goal == "home"

@@ -13,11 +13,13 @@ class DockCamera:
         self.grab, self.K, self.dist, self.every = grab, K, dist, every_s
         self.t_last: float | None = None
         self.last: dict = {"dock": None}
+        self.frame = None                    # последний снятый кадр — его же берёт медиа-связь (media_link.py)
 
     def vision(self, now: float) -> dict:
         if self.t_last is None or now - self.t_last >= self.every - 1e-9:
             self.t_last = now
-            self.last = {"dock": dock_tag.locate(self.grab(), self.K, self.dist)}
+            self.frame = self.grab()
+            self.last = {"dock": dock_tag.locate(self.frame, self.K, self.dist)}
         return self.last
 
 

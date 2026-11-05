@@ -122,6 +122,14 @@ def queue_blocks(q, stop, rate):
         yield block if block is None else resample(block, rate, RATE)
 
 
+def texts(blocks, vad, asr):
+    """Блоки 16 кГц (None — сброс) -> VAD -> распознавание -> непустые фразы."""
+    for seg in segments(blocks, vad):
+        text = asr.transcribe(seg, RATE)
+        if text:
+            yield text
+
+
 class MicListener:
     """Микрофон -> VAD -> распознавание. utterances() блокирует; pause()/resume() — для полудуплекса."""
 
@@ -151,10 +159,39 @@ class MicListener:
         rate = input_rate(sd, self.device)
         with sd.InputStream(samplerate=rate, device=self.device, channels=1, dtype="float32",
                             blocksize=int(round(BLOCK * rate / RATE)), callback=self._callback):
-            for seg in segments(rechunk(queue_blocks(self._q, self._stop, rate), BLOCK), self._vad):
-                text = self._asr.transcribe(seg, RATE)
-                if text:
-                    yield text
+            yield from texts(rechunk(queue_blocks(self._q, self._stop, rate), BLOCK), self._vad, self._asr)
+
+
+class RemoteMicListener:
+    """Микрофоны головы -> VAD -> распознавание: блоки берутся из MediaServer.audio (int16 16 кГц, кадры по 20 мс).
+    Пока голова говорит, её звук отбрасывается; когда замолчала — VAD сбрасывается (метка None)."""
+
+    def __init__(self, media, models_dir, vad=None, asr=None):
+        self._media = media
+        self._vad, self._asr = vad or make_vad(models_dir), asr or Transcriber(models_dir)
+        self._stop = threading.Event()
+
+    def close(self):
+        self._stop.set()
+
+    def _blocks(self):
+        was_speaking = False
+        while not self._stop.is_set():
+            try:
+                pcm = self._media.audio.get(timeout=0.2)
+            except queue.Empty:
+                pcm = None
+            if self._media.head_speaking:
+                was_speaking = True
+                continue
+            if was_speaking:
+                was_speaking = False
+                yield None
+            if pcm:
+                yield np.frombuffer(pcm, "<i2").astype(np.float32) / 32768.0
+
+    def utterances(self):
+        yield from texts(rechunk(self._blocks(), BLOCK), self._vad, self._asr)
 
 
 class PiperSpeaker:
@@ -179,6 +216,21 @@ class PiperSpeaker:
     def close(self):
         import sounddevice as sd
         sd.stop()
+
+
+class RemoteSpeaker:
+    """Голос Piper -> динамик головы (MediaServer.send_speech). Полудуплекс делает сама голова."""
+
+    def __init__(self, media, piper):
+        self._media, self._piper = media, piper
+
+    def say(self, text: str) -> None:
+        samples, rate = self._piper.synth(text)
+        pcm = (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()
+        self._media.send_speech(pcm, rate)
+
+    def close(self):
+        pass
 
 
 class HalfDuplexSpeaker:

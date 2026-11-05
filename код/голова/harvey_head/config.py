@@ -25,6 +25,7 @@ ALSA_DEVICE = "default"                      # имя карты ALSA — пре
 SPINE_PORT = "/dev/ttyACM0"                  # RP2350-Zero по USB
 SPINE_BAUD = 115200                          # для USB CDC скорость не важна
 BRAIN_HOST, BRAIN_PORT = "harvey-brain.local", 8765
+MEDIA_PORT = 8766                            # звук и картинка: второе соединение с ПК (media.py)
 TELEMETRY_TO_BRAIN_HZ = 5
 
 FPS = 30
@@ -38,7 +39,8 @@ def from_env(env: Mapping[str, str]) -> dict:
         value = env.get("HARVEY_" + name)
         return cast(value) if value else default
     return {"BRAIN_HOST": get("BRAIN_HOST", BRAIN_HOST), "BRAIN_PORT": get("BRAIN_PORT", BRAIN_PORT, int),
-            "SPINE_PORT": get("SPINE_PORT", SPINE_PORT), "ALSA_DEVICE": get("ALSA_DEVICE", ALSA_DEVICE)}
+            "SPINE_PORT": get("SPINE_PORT", SPINE_PORT), "ALSA_DEVICE": get("ALSA_DEVICE", ALSA_DEVICE),
+            "MEDIA_PORT": get("MEDIA_PORT", MEDIA_PORT, int)}
 
 
 globals().update(from_env(os.environ))

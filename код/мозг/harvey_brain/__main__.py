@@ -1,4 +1,4 @@
-"""python -m harvey_brain (--text | --mic) [--voice] [--models PATH] [--home PATH] [--model M] [--port 8765] [--no-head]"""
+"""python -m harvey_brain (--text | --mic) [--voice] [--models PATH] [--home PATH] [--model M] [--port 8765] [--no-head] [--head-audio] [--media-port 8766]"""
 import argparse
 import asyncio
 import os
@@ -11,8 +11,10 @@ from .dialog import Dialog
 from .llm import OllamaChat
 from .memory import Memory, resolve_home
 from .reply import Reply, to_head
+from .media_server import MediaServer
 from .server import HeadServer
-from .speech import HalfDuplexSpeaker, MicListener, ModelsPathError, PiperSpeaker, resolve_models_dir
+from .speech import (HalfDuplexSpeaker, MicListener, ModelsPathError, PiperSpeaker, RemoteMicListener, RemoteSpeaker,
+                     resolve_models_dir)
 
 DEFAULT_MODEL = "qwen3.6:35b"
 
@@ -27,6 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default=DEFAULT_MODEL, help="модель Ollama")
     p.add_argument("--port", type=int, default=8765, help="порт для головы")
     p.add_argument("--no-head", action="store_true", help="без сервера для головы")
+    p.add_argument("--head-audio", action="store_true", help="слушать микрофонами головы и говорить её динамиком (по Wi-Fi)")
+    p.add_argument("--media-port", type=int, default=8766, help="порт звука и картинки головы (--head-audio)")
     return p
 
 
@@ -91,11 +95,19 @@ def start_background(dialog, assistant, server, out, speaker, clock, poll_s) -> 
     return [asyncio.ensure_future(job) for job in jobs]
 
 
+async def start_media(media, out) -> None:
+    await media.start()
+    if not media.connected:
+        out("Жду голову…")
+
+
 async def run(args, input_fn, server, llm, out, listener=None, speaker=None, assistant=None,
-              clock=time.time, poll_s=0.5) -> None:
+              clock=time.time, poll_s=0.5, media=None) -> None:
     dialog = Dialog(llm, assistant, wall_fn=clock)
     if server:
         await server.start()
+    if media:
+        await start_media(media, out)
     background = start_background(dialog, assistant, server, out, speaker, clock, poll_s)
     try:
         if listener:
@@ -109,6 +121,8 @@ async def run(args, input_fn, server, llm, out, listener=None, speaker=None, ass
             task.cancel()
         if server:
             await server.stop()
+        if media:
+            await media.stop()
 
 
 def warm_up(llm, out) -> threading.Thread:
@@ -123,14 +137,19 @@ def warm_up(llm, out) -> threading.Thread:
 
 
 def wants_models(args, listener, speaker) -> bool:
-    return bool((args.mic and not listener) or ((args.mic or args.voice) and not speaker))
+    listening = args.mic or args.head_audio
+    return bool((listening and not listener) or ((listening or args.voice) and not speaker))
 
 
-def build_voice(args, listener, speaker):
-    """(слушатель, говорящий): подставленные снаружи остаются как есть; настоящие грузятся из папки моделей."""
+def build_voice(args, listener, speaker, media=None):
+    """(слушатель, говорящий): подставленные снаружи остаются как есть; настоящие грузятся из папки моделей.
+    --head-audio: слушает и говорит голова (через media), иначе — микрофон и динамик этого ПК."""
     if not wants_models(args, listener, speaker):
         return listener, speaker
     models = resolve_models_dir(args.models, os.environ, Path.home())
+    if args.head_audio:
+        return (listener or RemoteMicListener(media, models),
+                speaker or RemoteSpeaker(media, PiperSpeaker(models)))
     listener = listener or (MicListener(models) if args.mic else None)
     if speaker:
         return listener, speaker
@@ -139,10 +158,11 @@ def build_voice(args, listener, speaker):
 
 
 def main(argv=None, input_fn=input, server=None, llm=None, out=print, listener=None, speaker=None,
-         clock=time.time, poll_s=0.5) -> int:
+         clock=time.time, poll_s=0.5, media=None) -> int:
     args = build_parser().parse_args(argv)
+    media = (media or MediaServer(port=args.media_port)) if args.head_audio else None
     try:
-        listener, speaker = build_voice(args, listener, speaker)
+        listener, speaker = build_voice(args, listener, speaker, media)
     except ModelsPathError as e:
         out(str(e))
         return 2
@@ -155,7 +175,7 @@ def main(argv=None, input_fn=input, server=None, llm=None, out=print, listener=N
     llm = llm or OllamaChat(args.model, about=memory.about)
     warming = warm_up(llm, out)
     try:
-        asyncio.run(run(args, input_fn, server, llm, out, listener, speaker, Assistant(memory), clock, poll_s))
+        asyncio.run(run(args, input_fn, server, llm, out, listener, speaker, Assistant(memory), clock, poll_s, media))
     except KeyboardInterrupt:
         pass
     warming.join(0.5)

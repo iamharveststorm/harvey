@@ -18,3 +18,20 @@ if _FIRMWARE not in sys.path:
     sys.path.append(_FIRMWARE)
 
 from link import LineReader, encode  # noqa: E402,F401
+
+
+def _head_dir() -> Path:
+    """код/голова рядом с код/мозг: общий формат медиа-кадров (media.py, stdlib) берётся оттуда, без копии."""
+    here = Path(__file__)
+    for base in (here.absolute(), here.resolve()):
+        candidate = base.parents[2] / "голова"
+        if (candidate / "harvey_head" / "media.py").exists():
+            return candidate
+    raise ImportError("не найден код/голова/harvey_head/media.py — мозг и голова должны лежать рядом, как в репозитории")
+
+
+_HEAD = str(_head_dir())
+if _HEAD not in sys.path:
+    sys.path.append(_HEAD)
+
+from harvey_head import media  # noqa: E402,F401

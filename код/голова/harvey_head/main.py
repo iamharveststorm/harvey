@@ -15,6 +15,7 @@ from .eyes import render
 from .gait import Gait
 from .head import Head
 from .links import BrainLink, SpineLink
+from .media_link import build_media
 from .servos import Calibration
 
 INIT_FILE = Path(__file__).absolute().parents[3] / "документы" / "GC9D01 — код запуска Waveshare 0.71.txt"
@@ -57,6 +58,10 @@ async def run(sim: bool) -> None:
     head = Head(spine, eyes, brain, audio, now=now, telemetry_hz=config.TELEMETRY_TO_BRAIN_HZ, body=body, fps=config.FPS)
     stop = asyncio.Event()
     brain_task = asyncio.ensure_future(brain.run(stop))
+    media = None if sim else build_media(config, camera, audio.amp)     # звук и картинка для ПК (media_link.py)
+    media_task = asyncio.ensure_future(media.link.run(stop)) if media else None
+    if media:
+        media.start()
     pressed = [False] * len(pads)
     last_png = 0.0
     try:
@@ -69,6 +74,8 @@ async def run(sim: bool) -> None:
                     pressed[i] = pad.is_pressed
                     head.on_touch(i, pressed[i], now)
             state = head.tick(now)
+            if media:
+                media.tick(now)
             if sim and now - last_png >= 1.0:
                 render(state["look"], "left").save("eyes_sim.png")
                 last_png = now
@@ -76,6 +83,9 @@ async def run(sim: bool) -> None:
     finally:
         stop.set()
         brain_task.cancel()
+        if media:
+            media.close()
+            media_task.cancel()
 
 
 def main() -> None:

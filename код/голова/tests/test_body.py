@@ -136,3 +136,11 @@ def test_targets_use_the_servo_calibration():
     body = Body(spine, Behavior(0.0), Gait(), now=0.0, cal=Calibration({"LF_c": 1000}, {"LF_c": -1}))
     run(body, 0.1, tel_msg=tel())
     assert spine.of("j")[-1]["q"]["11"] == 1000                        # поворот ноги в стойке — 0°
+
+
+def test_dock_camera_keeps_the_last_grabbed_frame_for_the_media_link():
+    frame = np.full((720, 1280), 128, np.uint8)
+    cam = DockCamera(lambda: frame, np.eye(3), every_s=0.2)
+    assert cam.frame is None
+    cam.vision(0.0)
+    assert cam.frame is frame

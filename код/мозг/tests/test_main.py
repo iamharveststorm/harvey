@@ -280,3 +280,72 @@ def test_llm_gets_memory_about(monkeypatch):
     feed = iter(["", ""])
     m.main(["--text", "--no-head"], input_fn=lambda: next(feed), out=lambda s: None)
     assert "Аня" in seen[0]()
+
+
+# --- --head-audio ----------------------------------------------------------------------------------------------
+
+class FakeMediaServer:
+    def __init__(self, connected=False):
+        self.connected, self.started, self.stopped = connected, False, False
+
+    async def start(self):
+        self.started = True
+
+    async def stop(self):
+        self.stopped = True
+
+
+class Spk:
+    def __init__(self):
+        self.said = []
+
+    def say(self, text):
+        self.said.append(text)
+
+    def close(self):
+        pass
+
+
+def test_head_audio_options_parsed():
+    a = build_parser().parse_args(["--head-audio"])
+    assert a.head_audio and a.media_port == 8766
+    assert build_parser().parse_args(["--head-audio", "--media-port", "9001"]).media_port == 9001
+    assert not build_parser().parse_args(["--text"]).head_audio
+
+
+def test_head_audio_waits_for_the_head_and_says_so_once():
+    from harvey_brain.speech import ListListener
+    media, spk, out = FakeMediaServer(), Spk(), []
+    code = main(["--head-audio", "--no-head"], llm=FakeLLM(), out=out.append, media=media,
+                listener=ListListener(["Харви, посмотри на меня"]), speaker=spk)
+    assert code == 0 and out.count("Жду голову…") == 1
+    assert media.started and media.stopped and spk.said == ["Смотрю!"]
+
+
+def test_head_audio_with_the_head_already_connected_does_not_wait():
+    from harvey_brain.speech import ListListener
+    media, out = FakeMediaServer(connected=True), []
+    main(["--head-audio", "--no-head"], llm=FakeLLM(), out=out.append, media=media, listener=ListListener([]),
+         speaker=Spk())
+    assert "Жду голову…" not in out and media.started
+
+
+def test_without_head_audio_no_media_server_is_started():
+    code, out = run(["", ""], None, ["--no-head"])
+    assert "Жду голову…" not in out
+
+
+def test_build_voice_head_audio_uses_remote_listener_and_speaker(monkeypatch):
+    from harvey_brain import __main__ as m
+    monkeypatch.setattr(m, "RemoteMicListener", lambda media, models: ("remote-mic", media, models))
+    monkeypatch.setattr(m, "PiperSpeaker", lambda models: ("piper", models))
+    monkeypatch.setattr(m, "RemoteSpeaker", lambda media, piper: ("remote-spk", media, piper))
+    args = build_parser().parse_args(["--head-audio", "--models", "C:/m"])
+    listener, speaker = m.build_voice(args, None, None, media="M")
+    assert listener == ("remote-mic", "M", m.Path("C:/m")) and speaker == ("remote-spk", "M", ("piper", m.Path("C:/m")))
+
+
+def test_head_audio_keeps_injected_parts():
+    from harvey_brain import __main__ as m
+    args = build_parser().parse_args(["--head-audio"])
+    assert m.build_voice(args, "L", "S", media="M") == ("L", "S")
